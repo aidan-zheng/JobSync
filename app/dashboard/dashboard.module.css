@@ -1,0 +1,1126 @@
+/* Page & Shell */
+
+.page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  height: 100vh;
+  width: 100%;
+  padding: 2rem 1.5rem;
+}
+
+.popup {
+  margin: 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
+  border-radius: 1rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--jobsync-surface);
+  border: 1px solid var(--jobsync-border);
+  box-shadow: var(--jobsync-shadow);
+}
+
+.popupBehindModal {
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Header */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  min-height: 56px;
+  flex-shrink: 0;
+  background: var(--jobsync-surface);
+  border-bottom: 1px solid var(--jobsync-border);
+}
+
+.brandArea {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.brandIcon {
+  flex-shrink: 0;
+  color: var(--jobsync-brand);
+}
+
+.appName {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--jobsync-text);
+  letter-spacing: -0.02em;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.headerSep {
+  color: var(--jobsync-border-strong);
+  font-size: 1.1rem;
+  font-weight: 300;
+  user-select: none;
+}
+
+.headerSubtitle {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.userArea {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--jobsync-avatar-bg);
+  flex-shrink: 0;
+}
+
+.userName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.logoutBtn {
+  border: none;
+  background: none;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--jobsync-text-muted);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition:
+    color 0.15s,
+    background 0.15s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.logoutBtn:hover {
+  color: var(--jobsync-text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Content / Panels */
+
+.content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.resizeHandle {
+  width: 1px;
+  background: var(--jobsync-border);
+  transition:
+    background 0.2s,
+    width 0.15s;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.resizeHandle::after {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+  cursor: col-resize;
+}
+
+.resizeHandle:hover,
+.resizeHandle[data-resize-handle-active] {
+  width: 3px;
+  background: var(--jobsync-border-strong);
+}
+
+/* Left Panel – Applications List */
+
+.applicationsPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--jobsync-surface);
+  border-right: 1px solid var(--jobsync-border);
+  overflow: hidden;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1rem 0.5rem;
+  flex-shrink: 0;
+}
+
+.panelTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.newButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--jobsync-brand);
+  background: var(--jobsync-brand-soft);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.newButton:hover {
+  background: #d4d4d4;
+}
+
+.newButton:active {
+  transform: scale(0.97);
+}
+
+.searchWrapper {
+  position: relative;
+  margin: 0.5rem 1rem;
+  flex-shrink: 0;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--jobsync-text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.5rem 0.65rem 0.5rem 2rem;
+  font-size: 0.82rem;
+  border: 1px solid var(--jobsync-border-strong);
+  border-radius: 8px;
+  background: var(--jobsync-surface);
+  color: var(--jobsync-text);
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.searchInput::placeholder {
+  color: var(--jobsync-text-muted);
+}
+
+.searchInput:focus {
+  border-color: var(--jobsync-brand);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
+
+.filtersRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.filterButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--jobsync-text-muted);
+  background: transparent;
+  border: 1px solid var(--jobsync-border-strong);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  white-space: nowrap;
+}
+
+.filterButton:hover {
+  border-color: var(--jobsync-brand);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.listSubheader {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--jobsync-text);
+  border-top: 1px solid var(--jobsync-border);
+  flex-shrink: 0;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.subheaderIcon {
+  color: var(--jobsync-text-muted);
+}
+
+.applicationsList {
+  flex: 1;
+  min-height: 0;
+}
+
+.applicationsListInner {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0;
+}
+
+.appCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--jobsync-border);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.appCard:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.appCardActive {
+  background: rgba(0, 0, 0, 0.05);
+  border-left: 3px solid var(--jobsync-brand);
+}
+
+.appLogo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: white;
+  overflow: hidden;
+}
+
+.appLogoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.appInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.appCompany {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--jobsync-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appPosition {
+  font-size: 0.78rem;
+  color: var(--jobsync-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.statusBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.appDate {
+  font-size: 0.7rem;
+  color: var(--jobsync-text-muted);
+}
+
+.appCardWrap {
+  position: relative;
+  width: 100%;
+}
+
+.appCardMain {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+/* Center Panel – Application Details */
+
+.detailsPanel {
+  height: 100%;
+  background: #fafbfc;
+}
+
+.detailsEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--jobsync-text-muted);
+  font-size: 0.9rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.detailsPanelInner {
+  padding: 1.25rem 1.5rem 2rem;
+}
+
+.detailsHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.detailsDeleteBtn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--jobsync-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--jobsync-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.detailsDeleteBtn:hover {
+  background: rgba(185, 28, 28, 0.08);
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.3);
+}
+
+.fieldCancelBtn {
+  cursor: pointer;
+}
+
+.deleteConfirmDeleteBtn {
+  background: #b91c1c !important;
+  color: #fff !important;
+  border: none !important;
+  cursor: pointer;
+}
+.deleteConfirmDeleteBtn:hover {
+  background: #991b1b !important;
+}
+
+.detailsTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.3;
+}
+
+.detailsStatusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1.5px solid;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.actionButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--jobsync-border-strong);
+  background: var(--jobsync-surface);
+  color: var(--jobsync-text);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.1s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.actionBtn:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: #c0c0c0;
+}
+
+.actionBtn:active {
+  transform: scale(0.97);
+}
+
+.actionBtnPrimary {
+  background: #1a1a1a;
+  color: white;
+  border-color: #1a1a1a;
+}
+
+.actionBtnPrimary:hover {
+  background: #262626;
+  border-color: #262626;
+}
+
+.actionBtnGhost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--jobsync-text-muted);
+}
+
+.actionBtnGhost:hover {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--jobsync-text);
+}
+
+.detailsForm {
+  display: flex;
+  flex-direction: column;
+}
+
+.detailField {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--jobsync-border);
+}
+
+.detailField:last-child {
+  border-bottom: none;
+}
+
+.fieldRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.fieldGroup {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.fieldValueRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.5rem;
+}
+
+.fieldValueRow .fieldValue,
+.fieldValueRow .fieldEditWrap,
+.fieldValueRow .fieldInput,
+.fieldValueRow .fieldSelect {
+  margin: 0;
+}
+
+.fieldValueRow .editBtn {
+  align-self: center;
+}
+
+.fieldLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--jobsync-text-muted);
+  text-transform: capitalize;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.fieldValue {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--jobsync-text);
+  word-break: break-all;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.fieldEmpty {
+  font-style: italic;
+  color: var(--jobsync-text-muted);
+  font-weight: 400;
+}
+
+.editBtn {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--jobsync-brand);
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.12s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  align-self: center;
+}
+
+.editBtn:hover {
+  background: var(--jobsync-brand-soft);
+}
+
+.fieldEditWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.fieldInput,
+.fieldSelect {
+  flex: 1;
+  min-width: 8rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--jobsync-border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.fieldSaveBtn {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--jobsync-brand);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.fieldSaveBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.fieldSaveBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fieldCancelBtn {
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  background: #e5e5e5;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  color: var(--jobsync-text);
+}
+
+.fieldCancelBtn:hover:not(:disabled) {
+  background: #dddddd;
+}
+
+.fieldCancelBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.emailsForApp {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--jobsync-border);
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--jobsync-text);
+  margin-bottom: 0.75rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.emailForAppRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--jobsync-border);
+}
+
+.emailRowIcon {
+  flex-shrink: 0;
+  color: var(--jobsync-text-muted);
+}
+
+.emailRowContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.emailRowSubject {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.emailRowId {
+  font-size: 0.72rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+/* Right Panel – Emails & Timeline */
+
+.rightPanel {
+  height: 100%;
+  background: var(--jobsync-surface);
+  border-left: 1px solid var(--jobsync-border);
+}
+
+.rightPanelInner {
+  padding: 1.25rem 1rem 2rem;
+}
+
+.emailsLinkedSection {
+  margin-bottom: 1.5rem;
+}
+
+.emailCard {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--jobsync-border);
+}
+
+.emailCardBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.emailCardSubject {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.35;
+}
+
+.emailCardMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.emailCardDate {
+  font-size: 0.72rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.confidenceBadge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+/* Timeline */
+
+.timelineSection {
+  padding-top: 0.5rem;
+}
+
+.timelineList {
+  display: flex;
+  flex-direction: column;
+}
+
+.timelineEntry {
+  display: flex;
+  gap: 0.75rem;
+  min-height: 60px;
+}
+
+.timelineTrack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 24px;
+}
+
+.timelineDot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.timelineLine {
+  width: 2px;
+  flex: 1;
+  background: var(--jobsync-border-strong);
+  margin: 4px 0;
+}
+
+.timelineContent {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.timelineDesc {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.35;
+}
+
+.timelineDetail {
+  font-size: 0.78rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.timelineMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.15rem;
+}
+
+.timelineLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--jobsync-text-muted);
+  text-decoration: none;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--jobsync-border-strong);
+  border-radius: 4px;
+  transition:
+    border-color 0.12s,
+    color 0.12s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.timelineLink:hover {
+  border-color: var(--jobsync-brand);
+  color: var(--jobsync-brand);
+}
+
+.timelineDate {
+  font-size: 0.7rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+/* Shared */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--jobsync-text-muted);
+  font-size: 0.9rem;
+  gap: 0.3rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.emptyHint {
+  font-size: 0.78rem;
+  color: var(--jobsync-text-muted);
+  opacity: 0.7;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+/* New Application Modal */
+
+.modalContent {
+  max-width: 540px;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  border-radius: 16px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  gap: 0 !important;
+}
+
+.modalHeader {
+  padding: 1.25rem 2.5rem 1rem 1.5rem;
+  text-align: left;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.modalTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.modalDesc {
+  font-size: 0.875rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.4;
+}
+
+.modeToggle {
+  display: flex;
+  background: #f3f4f6;
+  border-radius: 10px;
+  padding: 4px;
+  margin: 0 1.5rem;
+  gap: 4px;
+}
+
+.modeBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--jobsync-text-muted);
+  transition:
+    background 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.modeBtn:hover {
+  color: var(--jobsync-text);
+}
+
+.modeBtnActive {
+  background: var(--jobsync-surface);
+  color: var(--jobsync-brand);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.modalBody {
+  padding: 1rem 1.5rem 0.5rem;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.autoSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.autoHint {
+  font-size: 0.75rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.manualGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1rem;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.formFieldFull {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  grid-column: 1 / -1;
+}
+
+.formLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.required {
+  color: #1a1a1a;
+}
+
+.formInput {
+  font-size: 0.85rem !important;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  border-radius: 8px !important;
+}
+
+.formSelect {
+  height: 36px;
+  padding: 0 0.65rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--jobsync-border-strong);
+  border-radius: 8px;
+  background: var(--jobsync-surface);
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  outline: none;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  width: 100%;
+}
+
+.formSelect:focus {
+  border-color: var(--jobsync-brand);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
+
+.formError {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #dc2626;
+  font-weight: 500;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.modalFooter {
+  padding: 0.75rem 1.5rem 1.25rem;
+  gap: 0.5rem;
+}
+
+.submitBtn {
+  background: var(--jobsync-brand) !important;
+  color: white !important;
+  font-weight: 600;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.submitBtn:hover {
+  opacity: 0.9;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 0.7s linear infinite;
+}

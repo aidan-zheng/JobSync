@@ -1,0 +1,293 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getApiUser } from "@/lib/supabase/api-auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type {
+  ApplicationStatus,
+  ApplicationFieldName,
+  LocationType,
+} from "@/types/applications";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const idNum = Number(id);
+  if (!Number.isInteger(idNum)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  const user = await getApiUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const admin = createAdminClient();
+  const { data: row, error } = await admin
+    .from("application_current")
+    .select("*")
+    .eq("id", idNum)
+    .single();
+
+  if (error || !row) {
+    return NextResponse.json(
+      { error: "Application not found" },
+      { status: 404 },
+    );
+  }
+
+  const { data: parent } = await admin
+    .from("applications")
+    .select("user_id")
+    .eq("id", row.application_id)
+    .single();
+  if (parent?.user_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  return NextResponse.json(row);
+}
+
+function buildUpdateAndEvent(
+  field_name: ApplicationFieldName,
+  value: unknown,
+): {
+  currentUpdate: Record<string, unknown>;
+  eventPayload: Record<string, unknown>;
+} {
+  const eventPayload: Record<string, unknown> = {
+    field_name,
+    source_type: "manual",
+    event_time: new Date().toISOString(),
+  };
+
+  switch (field_name) {
+    case "salary_per_hour": {
+      const n = value === "" || value == null ? null : Number(value);
+      return {
+        currentUpdate: { salary_per_hour: n },
+        eventPayload: { ...eventPayload, value_number: n },
+      };
+    }
+    case "salary_yearly": {
+      const n = value === "" || value == null ? null : Number(value);
+      return {
+        currentUpdate: {},
+        eventPayload: { ...eventPayload, value_number: n },
+      };
+    }
+    case "location_type": {
+      const v =
+        value === "" || value == null
+          ? null
+          : (String(value) as LocationType);
+      return {
+        currentUpdate: { location_type: v },
+        eventPayload: { ...eventPayload, value_location_type: v },
+      };
+    }
+    case "location": {
+      const v = value === "" || value == null ? null : String(value);
+      return {
+        currentUpdate: { location: v },
+        eventPayload: { ...eventPayload, value_text: v },
+      };
+    }
+    case "contact_person": {
+      const v = value === "" || value == null ? null : String(value);
+      return {
+        currentUpdate: { contact_person: v },
+        eventPayload: { ...eventPayload, value_text: v },
+      };
+    }
+    case "status": {
+      const v =
+        value === "" || value == null
+          ? null
+          : (String(value) as ApplicationStatus);
+      return {
+        currentUpdate: { status: v ?? "applied" },
+        eventPayload: { ...eventPayload, value_status: v },
+      };
+    }
+    case "date_applied": {
+      const v = value === "" || value == null ? null : String(value);
+      return {
+        currentUpdate: { date_applied: v ?? new Date().toISOString().slice(0, 10) },
+        eventPayload: { ...eventPayload, value_date: v },
+      };
+    }
+    case "notes": {
+      const v = value === "" || value == null ? null : String(value);
+      return {
+        currentUpdate: { notes: v },
+        eventPayload: { ...eventPayload, value_text: v },
+      };
+    }
+    default:
+      return { currentUpdate: {}, eventPayload };
+  }
+}
+
+const ALLOWED_FIELDS: ApplicationFieldName[] = [
+  "salary_per_hour",
+  "salary_yearly",
+  "location_type",
+  "location",
+  "contact_person",
+  "status",
+  "date_applied",
+  "notes",
+];
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const idNum = Number(id);
+  if (!Number.isInteger(idNum)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  let body: { field_name?: ApplicationFieldName; value?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const field_name = body?.field_name;
+  const value = body?.value;
+
+  if (!field_name || !ALLOWED_FIELDS.includes(field_name)) {
+    return NextResponse.json(
+      { error: "Missing or invalid field_name" },
+      { status: 400 },
+    );
+  }
+
+  const user = await getApiUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const admin = createAdminClient();
+
+  const { data: row, error: fetchError } = await admin
+    .from("application_current")
+    .select("application_id")
+    .eq("id", idNum)
+    .single();
+
+  if (fetchError || !row) {
+    return NextResponse.json(
+      { error: "Application not found" },
+      { status: 404 },
+    );
+  }
+
+  const { data: parent } = await admin
+    .from("applications")
+    .select("user_id")
+    .eq("id", row.application_id)
+    .single();
+  if (parent?.user_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { currentUpdate, eventPayload } = buildUpdateAndEvent(field_name, value);
+
+  if (Object.keys(currentUpdate).length > 0) {
+    const { error: updateError } = await admin
+      .from("application_current")
+      .update({ ...currentUpdate, updated_at: new Date().toISOString() })
+      .eq("id", idNum);
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: updateError.message },
+        { status: 500 },
+      );
+    }
+  }
+
+  // Non-blocking: don't fail the save if event logging has an issue
+  const { error: eventError } = await admin
+    .from("application_field_events")
+    .insert({
+      application_id: row.application_id,
+      ...eventPayload,
+    });
+
+  if (eventError) {
+    console.error("application_field_events insert failed:", eventError);
+  }
+
+  const { data: updated } = await admin
+    .from("application_current")
+    .select("*")
+    .eq("id", idNum)
+    .single();
+
+  return NextResponse.json(updated);
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const idNum = Number(id);
+  if (!Number.isInteger(idNum)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  const user = await getApiUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const admin = createAdminClient();
+
+  const { data: row, error: fetchError } = await admin
+    .from("application_current")
+    .select("application_id")
+    .eq("id", idNum)
+    .single();
+
+  if (fetchError || !row) {
+    return NextResponse.json(
+      { error: "Application not found" },
+      { status: 404 },
+    );
+  }
+
+  const applicationId = row.application_id;
+
+  const { error: deleteCurrentError } = await admin
+    .from("application_current")
+    .delete()
+    .eq("id", idNum);
+
+  if (deleteCurrentError) {
+    return NextResponse.json(
+      { error: deleteCurrentError.message },
+      { status: 500 },
+    );
+  }
+
+  const { error: deleteParentError } = await admin
+    .from("applications")
+    .delete()
+    .eq("id", applicationId);
+
+  if (deleteParentError) {
+    return NextResponse.json(
+      { error: deleteParentError.message },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ success: true });
+}

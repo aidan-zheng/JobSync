@@ -1,0 +1,170 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getApiUser } from "@/lib/supabase/api-auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { ApplicationStatus, LocationType } from "@/types/applications";
+
+export async function GET(request: NextRequest) {
+  const user = await getApiUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const admin = createAdminClient();
+
+  const { data: appIds, error: idsError } = await admin
+    .from("applications")
+    .select("id")
+    .eq("user_id", user.id);
+
+  if (idsError) {
+    return NextResponse.json({ error: idsError.message }, { status: 500 });
+  }
+
+  const ids = (appIds ?? []).map((r) => r.id);
+  if (ids.length === 0) {
+    return NextResponse.json([]);
+  }
+
+  const { data, error } = await admin
+    .from("application_current")
+    .select("*")
+    .in("application_id", ids)
+    .order("date_applied", { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(data ?? []);
+}
+
+const MANUAL_DEFAULTS = {
+  company_name: "Company",
+  job_title: "Job Title",
+  salary_per_hour: null as number | null,
+  location_type: null as LocationType | null,
+  location: null as string | null,
+  date_applied: new Date().toISOString().slice(0, 10),
+  contact_person: null as string | null,
+  status: "applied" as ApplicationStatus,
+  notes: null as string | null,
+};
+
+export type CreateApplicationBody =
+  | { mode: "automatic"; job_url?: string }
+  | {
+      mode: "manual";
+      company_name?: string;
+      job_title?: string;
+      salary_per_hour?: number | null;
+      location_type?: LocationType | null;
+      location?: string | null;
+      date_applied?: string;
+      contact_person?: string | null;
+      status?: ApplicationStatus;
+      notes?: string | null;
+    };
+
+export async function POST(request: NextRequest) {
+  let body: CreateApplicationBody;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const mode = body?.mode ?? "manual";
+
+  const manual =
+    mode === "automatic"
+      ? { mode: "manual" as const, ...MANUAL_DEFAULTS }
+      : body.mode === "manual"
+        ? body
+        : { mode: "manual" as const, ...MANUAL_DEFAULTS };
+
+  const row = {
+    company_name: manual.company_name?.trim() ?? MANUAL_DEFAULTS.company_name,
+    job_title: manual.job_title?.trim() ?? MANUAL_DEFAULTS.job_title,
+    salary_per_hour:
+      manual.salary_per_hour !== undefined
+        ? manual.salary_per_hour
+        : MANUAL_DEFAULTS.salary_per_hour,
+    location_type:
+      manual.location_type !== undefined
+        ? manual.location_type
+        : MANUAL_DEFAULTS.location_type,
+    location:
+      manual.location !== undefined
+        ? (manual.location?.trim() ?? null)
+        : MANUAL_DEFAULTS.location,
+    date_applied: manual.date_applied?.trim() || MANUAL_DEFAULTS.date_applied,
+    contact_person:
+      manual.contact_person !== undefined
+        ? (manual.contact_person?.trim() ?? null)
+        : MANUAL_DEFAULTS.contact_person,
+    status: manual.status ?? MANUAL_DEFAULTS.status,
+    notes:
+      manual.notes !== undefined
+        ? (manual.notes?.trim() ?? null)
+        : MANUAL_DEFAULTS.notes,
+  };
+
+  const user = await getApiUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const admin = createAdminClient();
+
+  const jobUrl =
+    mode === "automatic" && "job_url" in body && body.job_url
+      ? body.job_url.trim()
+      : null;
+
+  const { data: parentRow, error: parentError } = await admin
+    .from("applications")
+    .insert({ user_id: user.id, job_url: jobUrl || undefined })
+    .select("id")
+    .single();
+
+  if (parentError) {
+    return NextResponse.json(
+      { error: "Could not create application: " + parentError.message },
+      { status: 500 },
+    );
+  }
+
+  const applicationId = parentRow?.id;
+  if (applicationId == null) {
+    return NextResponse.json(
+      { error: "Insert did not return an id" },
+      { status: 500 },
+    );
+  }
+
+  const { data, error } = await admin
+    .from("application_current")
+    .insert({ ...row, application_id: applicationId })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const { error: eventError } = await admin
+    .from("application_field_events")
+    .insert({
+      application_id: applicationId,
+      source_type: "scrape",
+      field_name: "status",
+      value_status: row.status ?? "applied",
+      event_time: new Date().toISOString(),
+    });
+
+  if (eventError) {
+    console.error("application_field_events insert failed:", eventError);
+  }
+
+  return NextResponse.json(data);
+}
