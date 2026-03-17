@@ -310,14 +310,10 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Link not found" }, { status: 404 });
   }
 
-  const typedLink = link as {
-    id: number;
-    email_id: number;
-    application_id: number;
-    applications: { user_id: string };
-  };
+  const apps = link.applications as unknown as { user_id: string } | { user_id: string }[];
+  const ownerUserId = Array.isArray(apps) ? apps[0]?.user_id : apps?.user_id;
 
-  if (typedLink.applications.user_id !== user.id) {
+  if (ownerUserId !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -330,7 +326,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
 
-  const applicationId = typedLink.application_id;
+  const applicationId = link.application_id;
 
   const { data: inactiveLinks } = await admin
     .from("application_email_links")
@@ -378,22 +374,17 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Links not found" }, { status: 404 });
   }
 
-  const typedLinks = links as Array<{
-    id: number;
-    email_id: number;
-    application_id: number;
-    applications: { user_id: string };
-  }>;
-
-  for (const l of typedLinks) {
-    if (l.applications.user_id !== user.id) {
+  for (const l of links) {
+    const a = l.applications as unknown as { user_id: string } | { user_id: string }[];
+    const uid = Array.isArray(a) ? a[0]?.user_id : a?.user_id;
+    if (uid !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   }
 
-  const applicationId = typedLinks[0].application_id;
-  const emailIds = typedLinks.map((l) => l.email_id);
-  const linkIds = typedLinks.map((l) => l.id);
+  const applicationId = links[0].application_id;
+  const emailIds = links.map((l) => l.email_id);
+  const linkIds = links.map((l) => l.id);
 
   await admin
     .from("application_field_events")
