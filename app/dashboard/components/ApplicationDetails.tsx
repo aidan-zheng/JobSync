@@ -45,7 +45,7 @@ function AnimatedValue({ value, className, children }: {
   const [committed, setCommitted] = useState({ value, children });
   const prevValueRef = useRef(value);
   const mountedRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     if (!mountedRef.current) {
