@@ -152,18 +152,83 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const { error: eventError } = await admin
-    .from("application_field_events")
-    .insert({
-      application_id: applicationId,
-      source_type: "scrape",
-      field_name: "status",
-      value_status: row.status ?? "applied",
-      event_time: new Date().toISOString(),
-    });
+  const sourceType = mode === "automatic" ? "scrape" : "manual";
+  const eventTime = new Date().toISOString();
 
-  if (eventError) {
-    console.error("application_field_events insert failed:", eventError);
+  const initialEvents: Record<string, unknown>[] = [];
+
+  if (row.status) {
+    initialEvents.push({
+      application_id: applicationId,
+      field_name: "status",
+      source_type: sourceType,
+      value_status: row.status,
+      event_time: eventTime,
+    });
+  }
+  if (row.salary_per_hour != null) {
+    initialEvents.push({
+      application_id: applicationId,
+      field_name: "salary_per_hour",
+      source_type: sourceType,
+      value_number: row.salary_per_hour,
+      event_time: eventTime,
+    });
+  }
+  if (row.location_type) {
+    initialEvents.push({
+      application_id: applicationId,
+      field_name: "location_type",
+      source_type: sourceType,
+      value_location_type: row.location_type,
+      event_time: eventTime,
+    });
+  }
+  if (row.location) {
+    initialEvents.push({
+      application_id: applicationId,
+      field_name: "location",
+      source_type: sourceType,
+      value_text: row.location,
+      event_time: eventTime,
+    });
+  }
+  if (row.contact_person) {
+    initialEvents.push({
+      application_id: applicationId,
+      field_name: "contact_person",
+      source_type: sourceType,
+      value_text: row.contact_person,
+      event_time: eventTime,
+    });
+  }
+  if (row.date_applied) {
+    initialEvents.push({
+      application_id: applicationId,
+      field_name: "date_applied",
+      source_type: sourceType,
+      value_date: row.date_applied,
+      event_time: eventTime,
+    });
+  }
+  if (row.notes) {
+    initialEvents.push({
+      application_id: applicationId,
+      field_name: "notes",
+      source_type: sourceType,
+      value_text: row.notes,
+      event_time: eventTime,
+    });
+  }
+
+  if (initialEvents.length > 0) {
+    const { error: eventError } = await admin
+      .from("application_field_events")
+      .insert(initialEvents);
+
+    if (eventError) {
+      console.error("application_field_events insert failed:", eventError);
+    }
   }
 
   return NextResponse.json(data);

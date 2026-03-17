@@ -212,16 +212,39 @@ export async function PUT(
     }
   }
 
-  // Non-blocking: don't fail the save if event logging has an issue
+  // Build event row in table column order so position-based mapping never swaps source_type and field_name
+  const eventTime = new Date().toISOString();
+  const eventRow = {
+    application_id: row.application_id,
+    email_id: null as number | null,
+    field_name: field_name,
+    value_text: (eventPayload.value_text as string | undefined) ?? null,
+    value_number: (eventPayload.value_number as number | undefined) ?? null,
+    value_date: (eventPayload.value_date as string | undefined) ?? null,
+    value_location_type: (eventPayload.value_location_type as string | undefined) ?? null,
+    value_status: (eventPayload.value_status as string | undefined) ?? null,
+    event_time: eventTime,
+    confidence: null as number | null,
+    source_type: "manual" as const,
+  };
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[application_field_events] insert payload:", JSON.stringify(eventRow));
+  }
+
   const { error: eventError } = await admin
     .from("application_field_events")
-    .insert({
-      application_id: row.application_id,
-      ...eventPayload,
-    });
+    .insert(eventRow);
 
   if (eventError) {
     console.error("application_field_events insert failed:", eventError);
+    return NextResponse.json(
+      {
+        error: "Field saved but timeline event failed",
+        details: eventError.message,
+      },
+      { status: 500 },
+    );
   }
 
   const { data: updated } = await admin

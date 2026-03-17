@@ -28,12 +28,25 @@ export interface Application {
 
 export interface ApplicationEmail {
   id: string;
+  link_id: number;
   application_id: string;
   subject: string;
   sender: string;
   received_date: string;
   confidence: Confidence;
   linked: boolean;
+}
+
+export interface FullEmail {
+  id: number;
+  user_id: string;
+  from_email: string | null;
+  subject: string | null;
+  body: string | null;
+  received_at: string | null;
+  provider: string | null;
+  provider_message_id: string | null;
+  created_at: string | null;
 }
 
 export type SourceType = "scrape" | "email" | "manual";
@@ -69,11 +82,16 @@ export interface TimelineEvent {
   application_id: string;
   event_type: "scraped" | "email_update" | "manual_update" | "status_change";
   description: string;
+  field_label: string | null;
+  value_label: string | null;
   detail: string | null;
   confidence: Confidence | null;
   link_url: string | null;
   link_label: string | null;
   created_at: string;
+  email_id: number | null;
+  email_subject: string | null;
+  email_sender: string | null;
 }
 
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {

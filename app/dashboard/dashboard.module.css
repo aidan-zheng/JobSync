@@ -619,8 +619,10 @@
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--jobsync-text);
-  word-break: break-all;
+  overflow-wrap: break-word;
+  word-break: normal;
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  overflow: hidden;
 }
 
 .fieldEmpty {
@@ -713,6 +715,80 @@
   border-top: 1px solid var(--jobsync-border);
 }
 
+.emailsSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.emailsSectionHeader .sectionTitle {
+  margin-bottom: 0;
+}
+
+.emailsSectionActions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.emailSelectModeBtn {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--jobsync-text-muted);
+  background: none;
+  border: 1px solid var(--jobsync-border-strong);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.emailSelectModeBtn:hover {
+  color: var(--jobsync-text);
+  border-color: var(--jobsync-text);
+}
+
+.emailDeleteBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.emailDeleteBtn:hover {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
+.emailCheckbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--jobsync-border-strong);
+  flex-shrink: 0;
+  transition: all 0.15s;
+  color: white;
+}
+
+.emailCheckboxChecked {
+  background: var(--jobsync-text);
+  border-color: var(--jobsync-text);
+}
+
 .sectionTitle {
   font-size: 1rem;
   font-weight: 700;
@@ -725,8 +801,15 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.6rem 0;
+  padding: 0.6rem 0.5rem;
   border-bottom: 1px solid var(--jobsync-border);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.15s;
+}
+
+.emailForAppRow:hover {
+  background-color: rgba(0, 0, 0, 0.03);
 }
 
 .emailRowIcon {
@@ -752,10 +835,72 @@
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
 }
 
-.emailRowId {
+.emailRowMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.emailRowSender {
   font-size: 0.72rem;
   color: var(--jobsync-text-muted);
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.emailRowTime {
+  font-size: 0.68rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  white-space: nowrap;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.emailForAppRowUnlinked {
+  opacity: 0.5;
+}
+
+.emailLinkToggle {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.emailLinkToggleTrack {
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--jobsync-border-strong);
+  position: relative;
+  transition: background 0.2s ease;
+}
+
+.emailLinkToggleActive .emailLinkToggleTrack {
+  background: var(--jobsync-brand);
+}
+
+.emailLinkToggleThumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.emailLinkToggleActive .emailLinkToggleThumb {
+  transform: translateX(14px);
 }
 
 /* Right Panel – Emails & Timeline */
@@ -821,7 +966,7 @@
 /* Timeline */
 
 .timelineSection {
-  padding-top: 0.5rem;
+  padding-top: 0.25rem;
 }
 
 .timelineList {
@@ -832,7 +977,7 @@
 .timelineEntry {
   display: flex;
   gap: 0.75rem;
-  min-height: 60px;
+  min-height: 48px;
 }
 
 .timelineTrack {
@@ -840,55 +985,136 @@
   flex-direction: column;
   align-items: center;
   flex-shrink: 0;
-  width: 24px;
+  width: 28px;
 }
 
 .timelineDot {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 0 0 3px var(--jobsync-surface);
 }
 
 .timelineLine {
   width: 2px;
   flex: 1;
-  background: var(--jobsync-border-strong);
-  margin: 4px 0;
+  background: linear-gradient(
+    to bottom,
+    var(--jobsync-border-strong),
+    var(--jobsync-border)
+  );
+  margin: 2px 0;
+  border-radius: 1px;
 }
 
 .timelineContent {
   flex: 1;
   min-width: 0;
-  padding-bottom: 1rem;
+  padding-bottom: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.timelineTopRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.1rem;
+}
+
+.timelineTypeBadge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.timelineTime {
+  font-size: 0.68rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  opacity: 0.7;
+}
+
+.timelineDesc {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+.timelineHighlight {
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--jobsync-border);
+}
+
+.timelineDescBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.timelineValueBlock {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--jobsync-border);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.timelineDetail {
+  font-size: 0.75rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.3;
+}
+
+.timelineEmailHeader {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
 }
 
-.timelineDesc {
-  font-size: 0.82rem;
+.timelineEmailSubject {
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--jobsync-text);
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
-.timelineDetail {
-  font-size: 0.78rem;
+.timelineEmailSender {
+  font-size: 0.72rem;
   color: var(--jobsync-text-muted);
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-style: italic;
 }
 
-.timelineMeta {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.15rem;
+.timelineConfidence {
+  font-size: 0.68rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-style: italic;
 }
 
 .timelineLink {
@@ -899,22 +1125,102 @@
   font-weight: 500;
   color: var(--jobsync-text-muted);
   text-decoration: none;
-  padding: 0.15rem 0.4rem;
+  padding: 0.2rem 0.5rem;
   border: 1px solid var(--jobsync-border-strong);
-  border-radius: 4px;
+  border-radius: 6px;
   transition:
-    border-color 0.12s,
-    color 0.12s;
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  width: fit-content;
+  margin-top: 0.2rem;
 }
 
 .timelineLink:hover {
   border-color: var(--jobsync-brand);
   color: var(--jobsync-brand);
+  background: rgba(0, 0, 0, 0.02);
 }
 
-.timelineDate {
-  font-size: 0.7rem;
+.timelineGroupToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.timelineGroupToggle:hover .timelineGroupLabel {
+  color: var(--jobsync-brand);
+}
+
+.timelineGroupLabel {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  transition: color 0.12s;
+}
+
+.timelineGroupChevron {
+  flex-shrink: 0;
+  color: var(--jobsync-text-muted);
+}
+
+.timelineGroupChildren {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0.3rem;
+  margin-left: 0.15rem;
+  padding-left: 0.75rem;
+  border-left: 2px dashed var(--jobsync-border-strong);
+}
+
+.timelineGroupChild {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--jobsync-border);
+}
+
+.timelineGroupChild:last-child {
+  border-bottom: none;
+}
+
+.timelineGroupChildDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+}
+
+.timelineGroupChildContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.timelineGroupChildDesc {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--jobsync-text);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.35;
+}
+
+.timelineGroupChildDetail {
+  font-size: 0.72rem;
   color: var(--jobsync-text-muted);
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
 }
@@ -1122,5 +1428,299 @@
 }
 
 .spinner {
+  animation: spin 0.7s linear infinite;
+}
+
+/* ── Email Viewer Modal ── */
+
+.emailViewerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.emailViewerModal {
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.18),
+    0 4px 16px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.emailViewerToolbar {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--jobsync-border);
+  background: var(--jobsync-surface-header);
+  flex-shrink: 0;
+}
+
+.emailViewerCloseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--jobsync-text);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.emailViewerCloseBtn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #000;
+}
+
+.emailViewerToggleLabel {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--jobsync-text-muted);
+  margin-left: 0.4rem;
+  user-select: none;
+}
+
+.emailViewerToolbarSpacer {
+  flex: 1;
+}
+
+.emailViewerContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 2rem 2rem;
+}
+
+.emailViewerSubject {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--jobsync-text);
+  line-height: 1.3;
+  margin: 0 0 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+.emailViewerHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.emailViewerAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.emailViewerMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.emailViewerSenderRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.emailViewerSenderName {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--jobsync-text);
+}
+
+.emailViewerSenderEmail {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.78rem;
+  color: var(--jobsync-text-muted);
+}
+
+.emailViewerToRow {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.1rem;
+}
+
+.emailViewerToLabel {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.78rem;
+  color: var(--jobsync-text-muted);
+}
+
+.emailViewerDetailsToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--jobsync-text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background-color 0.15s;
+}
+
+.emailViewerDetailsToggle:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.emailViewerDetails {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.emailViewerDetailRow {
+  display: flex;
+  gap: 0.5rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: var(--jobsync-text);
+  line-height: 1.5;
+}
+
+.emailViewerDetailLabel {
+  color: var(--jobsync-text-muted);
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.emailViewerDate {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.72rem;
+  color: var(--jobsync-text-muted);
+  white-space: nowrap;
+}
+
+.emailViewerDivider {
+  height: 1px;
+  background: var(--jobsync-border);
+  margin: 1.25rem 0;
+}
+
+.emailViewerBody {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.9rem;
+  color: var(--jobsync-text);
+  line-height: 1.65;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.emailViewerBody a {
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+.emailViewerBody a:hover {
+  text-decoration: underline;
+}
+
+.emailViewerBody img {
+  max-width: 100%;
+  height: auto;
+}
+
+.emailViewerBody blockquote {
+  border-left: 3px solid #dadce0;
+  margin: 0.5rem 0;
+  padding: 0.25rem 0 0.25rem 1rem;
+  color: #5f6368;
+}
+
+.emailViewerBodyText {
+  font-family: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  color: var(--jobsync-text);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 0;
+}
+
+.emailViewerEmptyBody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--jobsync-text-muted);
+  gap: 0.5rem;
+}
+
+.emailViewerEmptyBody p {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+  margin: 0.5rem 0 0;
+}
+
+.emailViewerEmptyBody span {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: var(--jobsync-text-muted);
+}
+
+.emailViewerLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  gap: 0.75rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.85rem;
+  color: var(--jobsync-text-muted);
+}
+
+.emailViewerSpinner {
+  width: 24px;
+  height: 24px;
+  border: 2.5px solid var(--jobsync-border-strong);
+  border-top-color: var(--jobsync-text);
+  border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
