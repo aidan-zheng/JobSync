@@ -58,26 +58,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  type EmailRow = { id: number; subject: string | null; from_email: string | null; received_at: string | null };
+
   const mapped = (links ?? []).map(
     (row: {
       id: number;
       application_id: number;
       confidence: number | null;
       is_active: boolean;
-      emails: { id: number; subject: string | null; from_email: string | null; received_at: string | null };
-    }) => ({
-      id: String(row.emails?.id ?? row.application_id),
-      link_id: row.id,
-      application_id: String(row.application_id),
-      subject: row.emails?.subject ?? "",
-      sender: row.emails?.from_email ?? "",
-      received_date: row.emails?.received_at
-        ? new Date(row.emails.received_at).toISOString()
-        : "",
-      confidence:
-        row.confidence === 3 ? "high" : row.confidence === 1 ? "low" : "medium",
-      linked: row.is_active,
-    }),
+      emails: EmailRow | EmailRow[];
+    }) => {
+      const email = Array.isArray(row.emails) ? row.emails[0] : row.emails;
+      return {
+        id: String(email?.id ?? row.application_id),
+        link_id: row.id,
+        application_id: String(row.application_id),
+        subject: email?.subject ?? "",
+        sender: email?.from_email ?? "",
+        received_date: email?.received_at
+          ? new Date(email.received_at).toISOString()
+          : "",
+        confidence:
+          row.confidence === 3 ? "high" : row.confidence === 1 ? "low" : "medium",
+        linked: row.is_active,
+      };
+    },
   );
 
   return NextResponse.json(mapped);
