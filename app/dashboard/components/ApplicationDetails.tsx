@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Check, Mail, Loader2, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
@@ -18,12 +18,89 @@ import {
 } from "@/types/applications";
 import styles from "../dashboard.module.css";
 
+const SKELETON_HOLD_MS = 600;
+
+function SkeletonBar() {
+  return (
+    <motion.span
+      style={{
+        display: "block",
+        height: "1.1em",
+        width: "60%",
+        borderRadius: "999px",
+        background: "#d4d4d4",
+      }}
+      animate={{ opacity: [0.4, 0.8, 0.4] }}
+      transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+    />
+  );
+}
+
+function AnimatedValue({ value, className, children }: {
+  value: string;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const [showSkeleton, setShowSkeleton] = useState(false);
+  const [committed, setCommitted] = useState({ value, children });
+  const prevValueRef = useRef(value);
+  const mountedRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+
+    if (value === prevValueRef.current) {
+      setCommitted((c) => ({ ...c, children }));
+      return;
+    }
+
+    prevValueRef.current = value;
+    setShowSkeleton(true);
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setCommitted({ value, children });
+      setShowSkeleton(false);
+    }, SKELETON_HOLD_MS);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <span className={className} style={{ display: "block", position: "relative", minHeight: "1.2em" }}>
+      {showSkeleton ? (
+        <SkeletonBar />
+      ) : (
+        <motion.span
+          key={committed.value}
+          style={{ display: "block" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+        >
+          {committed.children ?? committed.value}
+        </motion.span>
+      )}
+    </span>
+  );
+}
+
 interface ApplicationDetailsProps {
   application: Application | null;
   emails: ApplicationEmail[];
   onApplicationUpdated: (app: Application) => void;
   onEventsChange: () => void;
   onDeleteClick: () => void;
+  onToggleEmailLink: (email: ApplicationEmail) => void;
+  onEmailClick: (email: ApplicationEmail) => void;
+  onDeleteEmails: (emails: ApplicationEmail[]) => void;
 }
 
 export default function ApplicationDetails({
@@ -32,6 +109,9 @@ export default function ApplicationDetails({
   onApplicationUpdated,
   onEventsChange,
   onDeleteClick,
+  onToggleEmailLink,
+  onEmailClick,
+  onDeleteEmails,
 }: ApplicationDetailsProps) {
   const [editingField, setEditingField] = useState<ApplicationFieldName | null>(
     null,
@@ -39,11 +119,15 @@ export default function ApplicationDetails({
   const [editValue, setEditValue] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [optimisticApp, setOptimisticApp] = useState<Application | null>(null);
+  const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
 
   useEffect(() => {
     setOptimisticApp(null);
     setEditingField(null);
     setEditValue("");
+    setSelectedEmailIds(new Set());
+    setSelectMode(false);
   }, [application?.id]);
 
   function cancelEdit() {
@@ -167,7 +251,7 @@ export default function ApplicationDetails({
     },
   ];
 
-  const linkedEmails = emails.filter((e) => e.linked);
+  const sortedEmails = [...emails].sort((a, b) => (a.linked === b.linked ? 0 : a.linked ? -1 : 1));
 
   function renderEditOrValue(
     fieldName: ApplicationFieldName,
@@ -207,13 +291,13 @@ export default function ApplicationDetails({
         );
       }
       return (
-        <span className={styles.fieldValue}>
+        <AnimatedValue value={displayValue || "__empty__"} className={styles.fieldValue}>
           {isEmpty ? (
             <em className={styles.fieldEmpty}>No notes added.</em>
           ) : (
             displayValue
           )}
-        </span>
+        </AnimatedValue>
       );
     }
 
@@ -254,7 +338,7 @@ export default function ApplicationDetails({
           </div>
         );
       }
-      return <span className={styles.fieldValue}>{displayValue}</span>;
+      return <AnimatedValue value={displayValue} className={styles.fieldValue} />;
     }
 
     if (fieldName === "location_type") {
@@ -295,7 +379,7 @@ export default function ApplicationDetails({
           </div>
         );
       }
-      return <span className={styles.fieldValue}>{displayValue}</span>;
+      return <AnimatedValue value={displayValue} className={styles.fieldValue} />;
     }
 
     if (fieldName === "date_applied") {
@@ -331,7 +415,7 @@ export default function ApplicationDetails({
           </div>
         );
       }
-      return <span className={styles.fieldValue}>{displayValue}</span>;
+      return <AnimatedValue value={displayValue} className={styles.fieldValue} />;
     }
 
     if (isEditing) {
@@ -368,13 +452,13 @@ export default function ApplicationDetails({
     }
 
     return (
-      <span className={styles.fieldValue}>
+      <AnimatedValue value={displayValue || "__empty__"} className={styles.fieldValue}>
         {isEmpty ? (
           <em className={styles.fieldEmpty}>No notes added.</em>
         ) : (
           displayValue
         )}
-      </span>
+      </AnimatedValue>
     );
   }
 
@@ -416,7 +500,7 @@ export default function ApplicationDetails({
         </div>
 
         <div className={styles.actionButtons}>
-          <button
+          <motion.button
             type="button"
             className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
             style={{
@@ -424,10 +508,21 @@ export default function ApplicationDetails({
               backgroundColor: STATUS_COLORS[app.status],
               color: "white",
             }}
+            layout
           >
             <Check size={16} />
-            {STATUS_LABELS[app.status]}
-          </button>
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={app.status}
+                initial={{ y: 6, opacity: 0, filter: "blur(2px)" }}
+                animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                exit={{ y: -6, opacity: 0, filter: "blur(2px)", position: "absolute" as const }}
+                transition={{ duration: 0.2 }}
+              >
+                {STATUS_LABELS[app.status]}
+              </motion.span>
+            </AnimatePresence>
+          </motion.button>
         </div>
 
         <div className={styles.detailsForm}>
@@ -522,25 +617,116 @@ export default function ApplicationDetails({
         </div>
 
         <div className={styles.emailsForApp}>
-          <h3 className={styles.sectionTitle}>Emails linked to this job</h3>
-          {linkedEmails.map((email) => (
-            <div key={email.id} className={styles.emailForAppRow}>
-              <Mail size={16} className={styles.emailRowIcon} />
-              <div className={styles.emailRowContent}>
-                <span className={styles.emailRowSubject}>
-                  {email.subject}
-                </span>
-                <span className={styles.emailRowId}>
-                  Email ID: #{email.id.slice(0, 4)}
-                </span>
+          <div className={styles.emailsSectionHeader}>
+            <h3 className={styles.sectionTitle}>Related emails</h3>
+            {emails.length > 0 && (
+              <div className={styles.emailsSectionActions}>
+                {selectMode && selectedEmailIds.size > 0 && (
+                  <button
+                    type="button"
+                    className={styles.emailDeleteBtn}
+                    onClick={() => {
+                      const toDelete = emails.filter((e) =>
+                        selectedEmailIds.has(e.link_id),
+                      );
+                      if (toDelete.length > 0) onDeleteEmails(toDelete);
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    Delete {selectedEmailIds.size}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={styles.emailSelectModeBtn}
+                  onClick={() => {
+                    setSelectMode((v) => !v);
+                    setSelectedEmailIds(new Set());
+                  }}
+                >
+                  {selectMode ? "Done" : "Select"}
+                </button>
               </div>
-              <button type="button" className={styles.editBtn}>
-                Edit
-              </button>
-            </div>
-          ))}
-          {linkedEmails.length === 0 && (
-            <p className={styles.emptyHint}>No linked emails yet.</p>
+            )}
+          </div>
+          {sortedEmails.map((email) => {
+            const isSelected = selectedEmailIds.has(email.link_id);
+            return (
+              <div
+                key={`${email.link_id}`}
+                className={`${styles.emailForAppRow} ${!email.linked ? styles.emailForAppRowUnlinked : ""}`}
+                onClick={() => {
+                  if (selectMode) {
+                    setSelectedEmailIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(email.link_id)) next.delete(email.link_id);
+                      else next.add(email.link_id);
+                      return next;
+                    });
+                  } else {
+                    onEmailClick(email);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    if (!selectMode) onEmailClick(email);
+                  }
+                }}
+              >
+                {selectMode && (
+                  <span
+                    className={`${styles.emailCheckbox} ${isSelected ? styles.emailCheckboxChecked : ""}`}
+                  >
+                    {isSelected && <Check size={12} />}
+                  </span>
+                )}
+                <Mail size={16} className={styles.emailRowIcon} />
+                <div className={styles.emailRowContent}>
+                  <span className={styles.emailRowSubject}>
+                    {email.subject}
+                  </span>
+                  <span className={styles.emailRowMeta}>
+                    <span className={styles.emailRowSender}>
+                      {email.sender}
+                    </span>
+                    {email.received_date && (
+                      <span className={styles.emailRowTime}>
+                        {(() => {
+                          const d = new Date(email.received_date);
+                          const now = new Date();
+                          const diffMs = now.getTime() - d.getTime();
+                          const diffDays = Math.floor(diffMs / 86400000);
+                          if (diffDays === 0) return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                          if (diffDays === 1) return "Yesterday";
+                          if (diffDays < 7) return d.toLocaleDateString("en-US", { weekday: "short" });
+                          return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                        })()}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {!selectMode && (
+                  <button
+                    type="button"
+                    className={`${styles.emailLinkToggle} ${email.linked ? styles.emailLinkToggleActive : ""}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleEmailLink(email);
+                    }}
+                    title={email.linked ? "Unlink email" : "Link email"}
+                  >
+                    <span className={styles.emailLinkToggleTrack}>
+                      <span className={styles.emailLinkToggleThumb} />
+                    </span>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {emails.length === 0 && (
+            <p className={styles.emptyHint}>No related emails yet.</p>
           )}
         </div>
       </div>

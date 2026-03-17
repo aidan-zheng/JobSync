@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Briefcase, User } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { Group, Panel, Separator } from "react-resizable-panels";
@@ -12,6 +12,7 @@ import Grainient from "@/components/Grainient/Grainient";
 import ApplicationsList from "./components/ApplicationsList";
 import ApplicationDetails from "./components/ApplicationDetails";
 import EmailsTimeline from "./components/EmailsTimeline";
+import EmailViewerModal from "./components/EmailViewerModal";
 import NewApplicationModal from "./components/NewApplicationModal";
 import {
   Dialog,
@@ -41,8 +42,16 @@ export default function DashboardPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [emails, setEmails] = useState<ApplicationEmail[]>([]);
+  const [rawEvents, setRawEvents] = useState<ApplicationFieldEvent[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const emailsRef = useRef(emails);
+  emailsRef.current = emails;
+  const rawEventsRef = useRef(rawEvents);
+  rawEventsRef.current = rawEvents;
+  const selectedAppRef = useRef(selectedApp);
+  selectedAppRef.current = selectedApp;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">(
@@ -51,6 +60,9 @@ export default function DashboardPage() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [showNewModal, setShowNewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [viewingEmail, setViewingEmail] = useState<ApplicationEmail | null>(null);
+  const [emailsToDelete, setEmailsToDelete] = useState<ApplicationEmail[]>([]);
+  const [showDeleteEmailsModal, setShowDeleteEmailsModal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u));
@@ -80,9 +92,21 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  const FIELD_LABELS: Record<string, string> = {
+    salary_per_hour: "Salary / hour",
+    salary_yearly: "Salary (yearly)",
+    location_type: "Location type",
+    location: "Location",
+    contact_person: "Contact person",
+    status: "Status",
+    date_applied: "Date applied",
+    notes: "Notes",
+  };
+
   function fieldEventToTimelineEvent(
     e: ApplicationFieldEvent,
     appId: number,
+    emailMeta?: { subject: string; sender: string },
   ): TimelineEvent {
     const source =
       e.source_type === "manual"
@@ -90,17 +114,6 @@ export default function DashboardPage() {
         : e.source_type === "email"
           ? "email_update"
           : "scraped";
-
-    const fieldLabel: Record<string, string> = {
-      salary_per_hour: "Salary / hour",
-      salary_yearly: "Salary (yearly)",
-      location_type: "Location type",
-      location: "Location",
-      contact_person: "Contact person",
-      status: "Status",
-      date_applied: "Date applied",
-      notes: "Notes",
-    };
 
     let valueStr = "";
     if (e.value_number != null) valueStr = String(e.value_number);
@@ -110,20 +123,21 @@ export default function DashboardPage() {
     else if (e.value_location_type)
       valueStr = LOCATION_LABELS[e.value_location_type];
 
-    const label = fieldLabel[e.field_name] ?? e.field_name;
-    const description =
-      source === "manual_update"
-        ? `Manual: ${label} set to ${valueStr || "—"}`
-        : source === "email_update"
-          ? `Email: ${label} → ${valueStr || "—"}`
-          : `Scrape: ${label} → ${valueStr || "—"}`;
+    const label = FIELD_LABELS[e.field_name] ?? e.field_name;
+    const val = valueStr || "—";
+    const description = `${label} set to ${val}`;
 
     return {
       id: String(e.id),
       application_id: String(appId),
       event_type: source,
       description,
-      detail: valueStr || null,
+      field_label: label,
+      value_label: val,
+      email_id: e.email_id,
+      email_subject: emailMeta?.subject ?? null,
+      email_sender: emailMeta?.sender ?? null,
+      detail: null,
       confidence: null,
       link_url: null,
       link_label: null,
@@ -131,34 +145,149 @@ export default function DashboardPage() {
     };
   }
 
+  function buildTimeline(
+    emailsList: ApplicationEmail[],
+    eventsList: ApplicationFieldEvent[],
+    appId: number,
+  ): TimelineEvent[] {
+    const emailById = new Map<number, ApplicationEmail>();
+    for (const em of emailsList) {
+      emailById.set(Number(em.id), em);
+    }
+
+    const emailIdsWithEvents = new Set<number>();
+    const mapped = eventsList.map((e) => {
+      const emailMeta = e.email_id ? emailById.get(e.email_id) : undefined;
+      if (e.email_id && emailMeta) emailIdsWithEvents.add(e.email_id);
+      return fieldEventToTimelineEvent(
+        e,
+        appId,
+        emailMeta
+          ? { subject: emailMeta.subject, sender: emailMeta.sender }
+          : undefined,
+      );
+    });
+
+    const standaloneEmails: TimelineEvent[] = emailsList
+      .filter((em) => !emailIdsWithEvents.has(Number(em.id)))
+      .map((email) => ({
+        id: `email-${email.id}`,
+        application_id: String(email.application_id),
+        event_type: "email_update" as const,
+        description: `Email received: ${email.subject}`,
+        field_label: null,
+        value_label: email.subject || null,
+        detail: `From ${email.sender}`,
+        confidence: email.confidence,
+        link_url: null,
+        link_label: null,
+        created_at: email.received_date,
+        email_id: Number(email.id),
+        email_subject: email.subject,
+        email_sender: email.sender,
+      }));
+
+    return [...mapped, ...standaloneEmails].sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+  }
+
+  function recalculateAppLocally(
+    app: Application,
+    events: ApplicationFieldEvent[],
+    emailsList: ApplicationEmail[],
+  ): Application {
+    const inactiveEmailIds = new Set(
+      emailsList.filter((e) => !e.linked).map((e) => Number(e.id)),
+    );
+
+    const result: Record<string, unknown> = {};
+    const seen = new Set<string>();
+
+    for (const ev of events) {
+      const f = ev.field_name;
+      if (seen.has(f)) continue;
+      if (ev.email_id != null && inactiveEmailIds.has(ev.email_id)) continue;
+      seen.add(f);
+
+      switch (f) {
+        case "status":
+          result.status = ev.value_status ?? null;
+          break;
+        case "salary_per_hour":
+          result.salary_per_hour = ev.value_number ?? null;
+          break;
+        case "location_type":
+          result.location_type = ev.value_location_type ?? null;
+          break;
+        case "location":
+          result.location = ev.value_text ?? null;
+          break;
+        case "contact_person":
+          result.contact_person = ev.value_text ?? null;
+          break;
+        case "date_applied":
+          result.date_applied = ev.value_date ?? null;
+          break;
+        case "notes":
+          result.notes = ev.value_text ?? null;
+          break;
+      }
+    }
+
+    return {
+      ...app,
+      status: (result.status as ApplicationStatus) ?? "applied",
+      salary_per_hour: (result.salary_per_hour as number | null) ?? null,
+      location_type: (result.location_type as Application["location_type"]) ?? null,
+      location: (result.location as string | null) ?? null,
+      contact_person: (result.contact_person as string | null) ?? null,
+      date_applied: (result.date_applied as string) ?? app.date_applied,
+      notes: (result.notes as string | null) ?? null,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
   useEffect(() => {
     if (!selectedApp) {
       setEmails([]);
+      setRawEvents([]);
       setTimeline([]);
       return;
     }
 
     async function fetchRelatedData() {
-      const [emailsRes, eventsRes] = await Promise.all([
-        supabase
-          .from("application_emails")
-          .select("*")
-          .eq("application_id", selectedApp!.id)
-          .order("received_date", { ascending: false }),
+      const [emailsApiRes, eventsRes] = await Promise.all([
+        fetch(
+          `/api/emails?application_id=${selectedApp!.application_id}`,
+          { credentials: "include" },
+        ),
         fetch(`/api/applications/${selectedApp!.id}/events`, {
           credentials: "include",
         }),
       ]);
 
-      if (!emailsRes.error && emailsRes.data) setEmails(emailsRes.data);
+      const emailsData = await emailsApiRes.json().catch(() => []);
+      const mappedEmails: ApplicationEmail[] = Array.isArray(emailsData)
+        ? emailsData
+        : [];
+      setEmails(mappedEmails);
 
       const eventsData = await eventsRes.json().catch(() => []);
       if (Array.isArray(eventsData)) {
-        const mapped = (eventsData as ApplicationFieldEvent[]).map((e) =>
-          fieldEventToTimelineEvent(e, selectedApp!.application_id),
+        const events = eventsData as ApplicationFieldEvent[];
+        setRawEvents(events);
+        const inactiveIds = new Set(
+          mappedEmails.filter((e) => !e.linked).map((e) => Number(e.id)),
         );
-        setTimeline(mapped);
+        const filteredEvents = events.filter(
+          (ev) => ev.email_id == null || !inactiveIds.has(ev.email_id),
+        );
+        const linkedEmails = mappedEmails.filter((e) => e.linked);
+        setTimeline(buildTimeline(linkedEmails, filteredEvents, selectedApp!.application_id));
       } else {
+        setRawEvents([]);
         setTimeline([]);
       }
     }
@@ -174,10 +303,18 @@ export default function DashboardPage() {
     });
     const eventsData = await res.json().catch(() => []);
     if (Array.isArray(eventsData)) {
-      const mapped = (eventsData as ApplicationFieldEvent[]).map((e) =>
-        fieldEventToTimelineEvent(e, selectedApp.application_id),
+      const events = eventsData as ApplicationFieldEvent[];
+      setRawEvents(events);
+      rawEventsRef.current = events;
+      const currentEmails = emailsRef.current;
+      const inactiveIds = new Set(
+        currentEmails.filter((e) => !e.linked).map((e) => Number(e.id)),
       );
-      setTimeline(mapped);
+      const filteredEvents = events.filter(
+        (ev) => ev.email_id == null || !inactiveIds.has(ev.email_id),
+      );
+      const linkedEmails = currentEmails.filter((e) => e.linked);
+      setTimeline(buildTimeline(linkedEmails, filteredEvents, selectedApp.application_id));
     }
   }
 
@@ -219,6 +356,90 @@ export default function DashboardPage() {
     setSelectedApp((prev) => (prev?.id === next.id ? next : prev));
   }
 
+  const toggleCooldownRef = useRef<Set<number>>(new Set());
+
+  function rebuildTimelineFromEmails(nextEmails: ApplicationEmail[]) {
+    const events = rawEventsRef.current;
+    const app = selectedAppRef.current;
+    if (!app) return;
+
+    const inactiveEmailIds = new Set(
+      nextEmails.filter((e) => !e.linked).map((e) => Number(e.id)),
+    );
+    const filteredEvents = events.filter(
+      (ev) => ev.email_id == null || !inactiveEmailIds.has(ev.email_id),
+    );
+    const linkedEmails = nextEmails.filter((e) => e.linked);
+    setTimeline(buildTimeline(linkedEmails, filteredEvents, app.application_id));
+  }
+
+  function handleToggleEmailLink(email: ApplicationEmail) {
+    const linkId = email.link_id;
+
+    if (toggleCooldownRef.current.has(linkId)) return;
+    toggleCooldownRef.current.add(linkId);
+    setTimeout(() => toggleCooldownRef.current.delete(linkId), 600);
+
+    const newActive = !email.linked;
+
+    setEmails((prev) => {
+      const next = prev.map((e) =>
+        e.link_id === linkId ? { ...e, linked: newActive } : e,
+      );
+      emailsRef.current = next;
+      return next;
+    });
+
+    setViewingEmail((prev) =>
+      prev?.link_id === linkId ? { ...prev, linked: newActive } : prev,
+    );
+
+    const app = selectedAppRef.current;
+    const events = rawEventsRef.current;
+    if (app) {
+      const recalculated = recalculateAppLocally(app, events, emailsRef.current);
+      setApplications((prev) =>
+        prev.map((a) => (a.id === recalculated.id ? recalculated : a)),
+      );
+      setSelectedApp(recalculated);
+      selectedAppRef.current = recalculated;
+    }
+
+    rebuildTimelineFromEmails(emailsRef.current);
+
+    fetch("/api/emails", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ link_id: linkId, is_active: newActive }),
+    }).then((res) => {
+      if (!res.ok) {
+        console.error("Failed to toggle email link, reverting");
+        setEmails((prev) => {
+          const reverted = prev.map((e) =>
+            e.link_id === linkId ? { ...e, linked: !newActive } : e,
+          );
+          emailsRef.current = reverted;
+          return reverted;
+        });
+        setViewingEmail((prev) =>
+          prev?.link_id === linkId ? { ...prev, linked: !newActive } : prev,
+        );
+        const latestApp = selectedAppRef.current;
+        const latestEvents = rawEventsRef.current;
+        if (latestApp) {
+          const revertedApp = recalculateAppLocally(latestApp, latestEvents, emailsRef.current);
+          setApplications((prev) =>
+            prev.map((a) => (a.id === revertedApp.id ? revertedApp : a)),
+          );
+          setSelectedApp(revertedApp);
+          selectedAppRef.current = revertedApp;
+        }
+        rebuildTimelineFromEmails(emailsRef.current);
+      }
+    });
+  }
+
   async function handleDeleteApplication(app: Application) {
     const res = await fetch(`/api/applications/${app.id}`, {
       method: "DELETE",
@@ -226,6 +447,44 @@ export default function DashboardPage() {
     if (!res.ok) return;
     setApplications((prev) => prev.filter((a) => a.id !== app.id));
     setSelectedApp((prev) => (prev?.id === app.id ? null : prev));
+  }
+
+  function handleRequestDeleteEmails(toDelete: ApplicationEmail[]) {
+    setEmailsToDelete(toDelete);
+    setShowDeleteEmailsModal(true);
+  }
+
+  async function handleConfirmDeleteEmails() {
+    if (emailsToDelete.length === 0) return;
+    setShowDeleteEmailsModal(false);
+
+    const linkIds = emailsToDelete.map((e) => e.link_id);
+
+    setEmails((prev) => prev.filter((e) => !linkIds.includes(e.link_id)));
+
+    const res = await fetch("/api/emails", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ link_ids: linkIds }),
+    });
+
+    if (!res.ok) {
+      console.error("Failed to delete emails");
+      return;
+    }
+
+    const result = await res.json().catch(() => null);
+    if (result?.application) {
+      const updated = result.application as Application;
+      setApplications((prev) =>
+        prev.map((a) => (a.id === updated.id ? updated : a)),
+      );
+      setSelectedApp((prev) => (prev?.id === updated.id ? updated : prev));
+    }
+
+    refetchEvents();
+    setEmailsToDelete([]);
   }
 
   return (
@@ -272,7 +531,7 @@ export default function DashboardPage() {
             ease: "easeInOut",
             type: "spring",
           }}
-          className={`${styles.popup} ${showNewModal || showDeleteModal ? styles.popupBehindModal : ""}`}
+          className={`${styles.popup} ${showNewModal || showDeleteModal || showDeleteEmailsModal ? styles.popupBehindModal : ""}`}
         >
           <header className={styles.header}>
             <div className={styles.brandArea}>
@@ -347,13 +606,16 @@ export default function DashboardPage() {
                   onApplicationUpdated={handleApplicationUpdated}
                   onEventsChange={refetchEvents}
                   onDeleteClick={() => setShowDeleteModal(true)}
+                  onToggleEmailLink={handleToggleEmailLink}
+                  onEmailClick={setViewingEmail}
+                  onDeleteEmails={handleRequestDeleteEmails}
                 />
               </Panel>
 
               <Separator className={styles.resizeHandle} />
 
               <Panel id="sidebar" defaultSize="30%" minSize="20%" maxSize="40%">
-                <EmailsTimeline emails={emails} timeline={timeline} />
+                <EmailsTimeline timeline={timeline} />
               </Panel>
             </Group>
           </div>
@@ -402,6 +664,54 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showDeleteEmailsModal} onOpenChange={setShowDeleteEmailsModal}>
+        <DialogContent className={styles.modalContent}>
+          <DialogHeader className={styles.modalHeader}>
+            <DialogTitle className={styles.modalTitle}>
+              Delete {emailsToDelete.length === 1 ? "Email" : `${emailsToDelete.length} Emails`}
+            </DialogTitle>
+            <DialogDescription className={styles.modalDesc}>
+              This will permanently delete{" "}
+              {emailsToDelete.length === 1 ? (
+                <strong>{emailsToDelete[0]?.subject || "this email"}</strong>
+              ) : (
+                <strong>{emailsToDelete.length} emails</strong>
+              )}{" "}
+              and all their associated timeline events. This action{" "}
+              <strong>cannot be undone</strong>.
+              <br />
+              <br />
+              If you&apos;re not sure, you can unlink the{" "}
+              {emailsToDelete.length === 1 ? "email" : "emails"} instead —
+              unlinking removes their effect on the application without
+              deleting any data.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className={styles.modalFooter}>
+            <Button
+              variant="outline"
+              className={styles.fieldCancelBtn}
+              onClick={() => setShowDeleteEmailsModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className={styles.deleteConfirmDeleteBtn}
+              onClick={handleConfirmDeleteEmails}
+            >
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <EmailViewerModal
+        email={viewingEmail}
+        onClose={() => setViewingEmail(null)}
+        onToggleLink={handleToggleEmailLink}
+      />
     </div>
   );
 }
