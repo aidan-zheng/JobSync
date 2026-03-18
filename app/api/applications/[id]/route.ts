@@ -288,10 +288,97 @@ export async function DELETE(
 
   const applicationId = row.application_id;
 
+  const { data: parent, error: parentError } = await admin
+    .from("applications")
+    .select("user_id")
+    .eq("id", applicationId)
+    .single();
+
+  if (parentError || !parent) {
+    return NextResponse.json(
+      { error: "Application not found" },
+      { status: 404 },
+    );
+  }
+
+  if (parent.user_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { data: links, error: linksError } = await admin
+    .from("application_email_links")
+    .select("email_id")
+    .eq("application_id", applicationId);
+
+  if (linksError) {
+    return NextResponse.json({ error: linksError.message }, { status: 500 });
+  }
+
+  const emailIds = (links ?? [])
+    .map((l) => Number((l as { email_id: number }).email_id))
+    .filter((n) => Number.isInteger(n));
+
+  const { error: deleteEventsError } = await admin
+    .from("application_field_events")
+    .delete()
+    .eq("application_id", applicationId);
+
+  if (deleteEventsError) {
+    return NextResponse.json(
+      { error: deleteEventsError.message },
+      { status: 500 },
+    );
+  }
+
+  const { error: deleteLinksError } = await admin
+    .from("application_email_links")
+    .delete()
+    .eq("application_id", applicationId);
+
+  if (deleteLinksError) {
+    return NextResponse.json(
+      { error: deleteLinksError.message },
+      { status: 500 },
+    );
+  }
+
+  if (emailIds.length > 0) {
+    const { data: remainingLinks, error: remainingLinksError } = await admin
+      .from("application_email_links")
+      .select("email_id")
+      .in("email_id", emailIds);
+
+    if (remainingLinksError) {
+      return NextResponse.json(
+        { error: remainingLinksError.message },
+        { status: 500 },
+      );
+    }
+
+    const stillReferenced = new Set(
+      (remainingLinks ?? []).map((l) => Number((l as { email_id: number }).email_id)),
+    );
+
+    const deletableEmailIds = emailIds.filter((id) => !stillReferenced.has(id));
+    if (deletableEmailIds.length > 0) {
+      const { error: deleteEmailsError } = await admin
+        .from("emails")
+        .delete()
+        .in("id", deletableEmailIds);
+
+      if (deleteEmailsError) {
+        return NextResponse.json(
+          { error: deleteEmailsError.message },
+          { status: 500 },
+        );
+      }
+    }
+  }
+
   const { error: deleteCurrentError } = await admin
     .from("application_current")
     .delete()
-    .eq("id", idNum);
+    .eq("application_id", applicationId);
 
   if (deleteCurrentError) {
     return NextResponse.json(
