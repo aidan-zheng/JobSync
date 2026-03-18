@@ -89,7 +89,6 @@ export default function DashboardPage() {
     }
 
     fetchApplications();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const FIELD_LABELS: Record<string, string> = {
@@ -294,7 +293,7 @@ export default function DashboardPage() {
 
     fetchRelatedData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedApp]);
+  }, [selectedApp?.id]);
 
   async function refetchEvents() {
     if (!selectedApp) return;
