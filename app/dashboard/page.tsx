@@ -65,6 +65,14 @@ export default function DashboardPage() {
   const [viewingEmail, setViewingEmail] = useState<ApplicationEmail | null>(null);
   const [emailsToDelete, setEmailsToDelete] = useState<ApplicationEmail[]>([]);
   const [showDeleteEmailsModal, setShowDeleteEmailsModal] = useState(false);
+  const [appsSelectMode, setAppsSelectMode] = useState(false);
+  const [selectedApplicationIds, setSelectedApplicationIds] = useState<Set<number>>(
+    () => new Set(),
+  );
+  const [applicationsToDelete, setApplicationsToDelete] = useState<Application[]>([]);
+  const [showBulkDeleteApplicationsModal, setShowBulkDeleteApplicationsModal] =
+    useState(false);
+  const [bulkDeletingApplications, setBulkDeletingApplications] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u));
@@ -477,6 +485,13 @@ export default function DashboardPage() {
   }
 
   async function handleDeleteApplication(app: Application) {
+    setSelectedApplicationIds((prev) => {
+      if (!prev.has(app.id)) return prev;
+      const next = new Set(prev);
+      next.delete(app.id);
+      return next;
+    });
+
     const deletingSelectedApp = selectedAppRef.current?.id === app.id;
 
     const nextApps = applicationsRef.current.filter((a) => a.id !== app.id);
@@ -510,6 +525,98 @@ export default function DashboardPage() {
     console.error("Failed to delete application:", msg);
     alert(`Delete failed: ${msg}`);
     await refetchApplications();
+  }
+
+  function handleToggleApplicationsSelectMode() {
+    if (bulkDeletingApplications) return;
+    setAppsSelectMode((prev) => !prev);
+    setSelectedApplicationIds(new Set());
+  }
+
+  function handleToggleApplicationSelected(appId: number) {
+    if (bulkDeletingApplications) return;
+    setSelectedApplicationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(appId)) next.delete(appId);
+      else next.add(appId);
+      return next;
+    });
+  }
+
+  function handleRequestBulkDeleteApplications() {
+    if (bulkDeletingApplications) return;
+    if (selectedApplicationIds.size === 0) return;
+
+    const selected = applicationsRef.current.filter((a) =>
+      selectedApplicationIds.has(a.id),
+    );
+    if (selected.length === 0) return;
+
+    setApplicationsToDelete(selected);
+    setShowBulkDeleteApplicationsModal(true);
+  }
+
+  async function handleConfirmBulkDeleteApplications() {
+    if (bulkDeletingApplications) return;
+    if (applicationsToDelete.length === 0) return;
+    const toDelete = applicationsToDelete;
+
+    setShowBulkDeleteApplicationsModal(false);
+    setApplicationsToDelete([]);
+    setAppsSelectMode(false);
+    setSelectedApplicationIds(new Set());
+    setBulkDeletingApplications(true);
+
+    try {
+      const ids = toDelete.map((a) => a.id);
+      const idSet = new Set(ids);
+
+      const nextApps = applicationsRef.current.filter((a) => !idSet.has(a.id));
+      applicationsRef.current = nextApps;
+      setApplications(nextApps);
+
+      if (selectedAppRef.current && idSet.has(selectedAppRef.current.id)) {
+        beginRelatedDataRequest();
+        emailsRef.current = [];
+        rawEventsRef.current = [];
+        setEmails([]);
+        setRawEvents([]);
+        setTimeline([]);
+        setViewingEmail(null);
+
+        const nextSelected = nextApps[0] ?? null;
+        selectedAppRef.current = nextSelected;
+        setSelectedApp(nextSelected);
+      }
+
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          const res = await fetch(`/api/applications/${id}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+          if (res.ok) return;
+
+          const body = await res.json().catch(() => ({}));
+          const msg = body?.error ?? res.statusText;
+          throw new Error(msg);
+        }),
+      );
+
+      const failures = results
+        .filter((r) => r.status === "rejected")
+        .map((r) => (r as PromiseRejectedResult).reason);
+
+      if (failures.length > 0) {
+        console.error("Bulk delete failed:", failures);
+        alert(
+          `Some deletions failed (${failures.length}/${ids.length}). Refreshing applications...`,
+        );
+        await refetchApplications();
+      }
+    } finally {
+      setBulkDeletingApplications(false);
+    }
   }
 
   function handleRequestDeleteEmails(toDelete: ApplicationEmail[]) {
@@ -650,7 +757,7 @@ export default function DashboardPage() {
             ease: "easeInOut",
             type: "spring",
           }}
-          className={`${styles.popup} ${showNewModal || showDeleteModal || showDeleteEmailsModal ? styles.popupBehindModal : ""}`}
+          className={`${styles.popup} ${showNewModal || showDeleteModal || showDeleteEmailsModal || showBulkDeleteApplicationsModal ? styles.popupBehindModal : ""}`}
         >
           <header className={styles.header}>
             <div className={styles.brandArea}>
@@ -713,6 +820,11 @@ export default function DashboardPage() {
                   onStatusFilterChange={setStatusFilter}
                   locationFilter={locationFilter}
                   onLocationFilterChange={setLocationFilter}
+                  selectMode={appsSelectMode}
+                  selectedIds={selectedApplicationIds}
+                  onToggleSelectMode={handleToggleApplicationsSelectMode}
+                  onToggleSelected={handleToggleApplicationSelected}
+                  onDeleteSelected={handleRequestBulkDeleteApplications}
                 />
               </Panel>
 
@@ -779,6 +891,54 @@ export default function DashboardPage() {
               }}
             >
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showBulkDeleteApplicationsModal}
+        onOpenChange={setShowBulkDeleteApplicationsModal}
+      >
+        <DialogContent className={styles.modalContent}>
+          <DialogHeader className={styles.modalHeader}>
+            <DialogTitle className={styles.modalTitle}>
+              Delete{" "}
+              {applicationsToDelete.length === 1
+                ? "Application"
+                : `${applicationsToDelete.length} Applications`}
+            </DialogTitle>
+            <DialogDescription className={styles.modalDesc}>
+              This will permanently delete{" "}
+              {applicationsToDelete.length === 1 ? (
+                <strong>
+                  {applicationsToDelete[0]?.company_name ?? "this application"}
+                  {applicationsToDelete[0]?.job_title
+                    ? ` â€” ${applicationsToDelete[0].job_title}`
+                    : ""}
+                </strong>
+              ) : (
+                <strong>{applicationsToDelete.length} applications</strong>
+              )}
+              . This action <strong>cannot be undone</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className={styles.modalFooter}>
+            <Button
+              variant="outline"
+              className={styles.fieldCancelBtn}
+              onClick={() => setShowBulkDeleteApplicationsModal(false)}
+              disabled={bulkDeletingApplications}
+            >
+              Cancel
+            </Button>
+            <Button
+              className={styles.deleteConfirmDeleteBtn}
+              onClick={handleConfirmBulkDeleteApplications}
+              disabled={bulkDeletingApplications || applicationsToDelete.length === 0}
+            >
+              Delete permanently
             </Button>
           </DialogFooter>
         </DialogContent>

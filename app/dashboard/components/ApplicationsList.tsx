@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Search, Plus, ChevronDown } from "lucide-react";
+import { Search, Plus, ChevronDown, Check, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Application, ApplicationStatus } from "@/types/applications";
 import { STATUS_LABELS, STATUS_COLORS } from "@/types/applications";
@@ -18,6 +18,11 @@ interface ApplicationsListProps {
   onStatusFilterChange: (s: ApplicationStatus | "all") => void;
   locationFilter: string;
   onLocationFilterChange: (l: string) => void;
+  selectMode: boolean;
+  selectedIds: Set<number>;
+  onToggleSelectMode: () => void;
+  onToggleSelected: (appId: number) => void;
+  onDeleteSelected: () => void;
 }
 
 const COMPANY_COLORS = [
@@ -53,7 +58,14 @@ export default function ApplicationsList({
   onStatusFilterChange,
   locationFilter,
   onLocationFilterChange,
+  selectMode,
+  selectedIds,
+  onToggleSelectMode,
+  onToggleSelected,
+  onDeleteSelected,
 }: ApplicationsListProps) {
+  const selectedCount = selectedIds.size;
+
   return (
     <div className={styles.applicationsPanel}>
       <div className={styles.panelHeader}>
@@ -113,8 +125,41 @@ export default function ApplicationsList({
       </div>
 
       <div className={styles.listSubheader}>
-        <Search size={14} className={styles.subheaderIcon} />
-        Applications
+        <div className={styles.listSubheaderLeft}>
+          <Search size={14} className={styles.subheaderIcon} />
+          Applications
+        </div>
+        <div className={styles.listSubheaderActions}>
+          {!selectMode ? (
+            <button
+              type="button"
+              className={styles.emailSelectModeBtn}
+              onClick={onToggleSelectMode}
+            >
+              Select
+            </button>
+          ) : (
+            <>
+              {selectedCount > 0 && (
+                <button
+                  type="button"
+                  className={styles.emailDeleteBtn}
+                  onClick={onDeleteSelected}
+                >
+                  <Trash2 size={13} />
+                  Delete {selectedCount}
+                </button>
+              )}
+              <button
+                type="button"
+                className={styles.emailSelectModeBtn}
+                onClick={onToggleSelectMode}
+              >
+                Done
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <ScrollArea className={styles.applicationsList}>
@@ -127,6 +172,56 @@ export default function ApplicationsList({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: index * 0.04 }}
             >
+              {selectMode ? (
+                <button
+                  type="button"
+                  className={`${styles.appCard} ${selectedIds.has(app.id) || selectedApp?.id === app.id ? styles.appCardActive : ""}`}
+                  aria-pressed={selectedIds.has(app.id)}
+                  onClick={() => onToggleSelected(app.id)}
+                >
+                  <div className={styles.appCardMain}>
+                    <span
+                      className={`${styles.emailCheckbox} ${selectedIds.has(app.id) ? styles.emailCheckboxChecked : ""}`}
+                    >
+                      {selectedIds.has(app.id) && <Check size={12} />}
+                    </span>
+                    <div
+                      className={styles.appLogo}
+                      style={{ backgroundColor: getCompanyColor(app.company_name) }}
+                    >
+                      <span>
+                        {(app.company_name ?? "?").charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className={styles.appInfo}>
+                      <span className={styles.appCompany}>
+                        {app.company_name ?? "Unknown company"}
+                      </span>
+                      <span className={styles.appPosition}>
+                        {app.job_title ?? "Unknown role"}
+                      </span>
+                      <div className={styles.appMeta}>
+                        <span
+                          className={styles.statusBadge}
+                          style={{
+                            color: STATUS_COLORS[app.status],
+                            backgroundColor: `${STATUS_COLORS[app.status]}15`,
+                          }}
+                        >
+                          {STATUS_LABELS[app.status]}
+                        </span>
+                        <span className={styles.appDate}>
+                          {new Date(app.date_applied).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ) : (
               <button
                 type="button"
                 className={`${styles.appCard} ${selectedApp?.id === app.id ? styles.appCardActive : ""}`}
@@ -169,6 +264,7 @@ export default function ApplicationsList({
                   </div>
                 </div>
               </button>
+              )}
             </motion.div>
           ))}
 
