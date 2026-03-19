@@ -288,7 +288,7 @@
 .listSubheader {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: space-between;
   padding: 0.5rem 1rem;
   font-size: 0.82rem;
   font-weight: 700;
@@ -296,6 +296,20 @@
   border-top: 1px solid var(--jobsync-border);
   flex-shrink: 0;
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.listSubheaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.listSubheaderActions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
 }
 
 .subheaderIcon {

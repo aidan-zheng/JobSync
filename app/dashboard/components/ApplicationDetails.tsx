@@ -149,7 +149,6 @@ export default function ApplicationDetails({
 
   async function handleSave(field_name: ApplicationFieldName) {
     if (!application || saving) return;
-    setSaving(true);
 
     const rawValue =
       field_name === "salary_per_hour" || field_name === "salary_yearly"
@@ -161,6 +160,28 @@ export default function ApplicationDetails({
           : editValue === "N/A" || editValue === ""
             ? null
             : editValue;
+
+    let currentValue: string | number | null = null;
+    if (field_name === "salary_per_hour") currentValue = application.salary_per_hour ?? null;
+    else if (field_name === "salary_yearly") currentValue = application.salary_per_hour ?? null;
+    else if (field_name === "location_type") currentValue = application.location_type ?? null;
+    else if (field_name === "location") currentValue = application.location ?? null;
+    else if (field_name === "contact_person") currentValue = application.contact_person ?? null;
+    else if (field_name === "status") currentValue = application.status;
+    else if (field_name === "date_applied") currentValue = application.date_applied ?? null;
+    else if (field_name === "notes") currentValue = application.notes ?? null;
+
+    const normalizedRaw = field_name === "date_applied" && rawValue != null
+      ? String(rawValue).slice(0, 10) : rawValue;
+    const normalizedCurrent = field_name === "date_applied" && currentValue != null
+      ? String(currentValue).slice(0, 10) : currentValue;
+
+    if (normalizedRaw === normalizedCurrent) {
+      cancelEdit();
+      return;
+    }
+
+    setSaving(true);
 
     const merged: Application = { ...application };
     if (field_name === "salary_per_hour") merged.salary_per_hour = rawValue as number | null;
