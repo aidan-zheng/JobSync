@@ -46,6 +46,8 @@ export default function DashboardPage() {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const applicationsRef = useRef(applications);
+  applicationsRef.current = applications;
   const emailsRef = useRef(emails);
   emailsRef.current = emails;
   const rawEventsRef = useRef(rawEvents);
@@ -68,27 +70,28 @@ export default function DashboardPage() {
     supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u));
   }, [supabase.auth]);
 
-  useEffect(() => {
+  async function refetchApplications() {
     if (!user) return;
 
-    async function fetchApplications() {
-      setLoading(true);
-      const res = await fetch("/api/applications", { credentials: "include" });
-      const data = await res.json().catch(() => []);
+    setLoading(true);
+    const res = await fetch("/api/applications", { credentials: "include" });
+    const data = await res.json().catch(() => []);
 
-      if (res.ok && Array.isArray(data)) {
-        setApplications(data);
-        setSelectedApp((prev) => {
-          if (data.length > 0 && !prev) return data[0];
-          if (prev && !data.some((a: Application) => a.id === prev?.id))
-            return data[0] ?? null;
-          return prev;
-        });
-      }
-      setLoading(false);
+    if (res.ok && Array.isArray(data)) {
+      applicationsRef.current = data;
+      setApplications(data);
+      setSelectedApp((prev) => {
+        if (data.length > 0 && !prev) return data[0];
+        if (prev && !data.some((a: Application) => a.id === prev?.id))
+          return data[0] ?? null;
+        return prev;
+      });
     }
+    setLoading(false);
+  }
 
-    fetchApplications();
+  useEffect(() => {
+    refetchApplications();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -249,35 +252,44 @@ export default function DashboardPage() {
     };
   }
 
-  useEffect(() => {
-    if (!selectedApp) {
-      setEmails([]);
-      setRawEvents([]);
-      setTimeline([]);
-      return;
-    }
+  const relatedDataRequestIdRef = useRef(0);
 
-    async function fetchRelatedData() {
+  function beginRelatedDataRequest(): number {
+    relatedDataRequestIdRef.current += 1;
+    return relatedDataRequestIdRef.current;
+  }
+
+  async function loadRelatedData(app: Application) {
+    const requestId = beginRelatedDataRequest();
+
+    try {
       const [emailsApiRes, eventsRes] = await Promise.all([
-        fetch(
-          `/api/emails?application_id=${selectedApp!.application_id}`,
-          { credentials: "include" },
-        ),
-        fetch(`/api/applications/${selectedApp!.id}/events`, {
+        fetch(`/api/emails?application_id=${app.application_id}`, {
+          credentials: "include",
+        }),
+        fetch(`/api/applications/${app.id}/events`, {
           credentials: "include",
         }),
       ]);
 
-      const emailsData = await emailsApiRes.json().catch(() => []);
+      const [emailsData, eventsData] = await Promise.all([
+        emailsApiRes.json().catch(() => []),
+        eventsRes.json().catch(() => []),
+      ]);
+
+      if (requestId !== relatedDataRequestIdRef.current) return;
+
       const mappedEmails: ApplicationEmail[] = Array.isArray(emailsData)
         ? emailsData
         : [];
+      emailsRef.current = mappedEmails;
       setEmails(mappedEmails);
 
-      const eventsData = await eventsRes.json().catch(() => []);
       if (Array.isArray(eventsData)) {
         const events = eventsData as ApplicationFieldEvent[];
+        rawEventsRef.current = events;
         setRawEvents(events);
+
         const inactiveIds = new Set(
           mappedEmails.filter((e) => !e.linked).map((e) => Number(e.id)),
         );
@@ -285,16 +297,40 @@ export default function DashboardPage() {
           (ev) => ev.email_id == null || !inactiveIds.has(ev.email_id),
         );
         const linkedEmails = mappedEmails.filter((e) => e.linked);
-        setTimeline(buildTimeline(linkedEmails, filteredEvents, selectedApp!.application_id));
-      } else {
-        setRawEvents([]);
-        setTimeline([]);
+        setTimeline(
+          buildTimeline(linkedEmails, filteredEvents, app.application_id),
+        );
+        return;
       }
+
+      rawEventsRef.current = [];
+      setRawEvents([]);
+      setTimeline([]);
+    } catch (err) {
+      if (requestId !== relatedDataRequestIdRef.current) return;
+      console.error("Failed to load related data:", err);
+      emailsRef.current = [];
+      rawEventsRef.current = [];
+      setEmails([]);
+      setRawEvents([]);
+      setTimeline([]);
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedApp) {
+      beginRelatedDataRequest();
+      emailsRef.current = [];
+      rawEventsRef.current = [];
+      setEmails([]);
+      setRawEvents([]);
+      setTimeline([]);
+      return;
     }
 
-    fetchRelatedData();
+    loadRelatedData(selectedApp);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedApp]);
+  }, [selectedApp?.id]);
 
   async function refetchEvents() {
     if (!selectedApp) return;
@@ -441,12 +477,39 @@ export default function DashboardPage() {
   }
 
   async function handleDeleteApplication(app: Application) {
+    const deletingSelectedApp = selectedAppRef.current?.id === app.id;
+
+    const nextApps = applicationsRef.current.filter((a) => a.id !== app.id);
+    applicationsRef.current = nextApps;
+    setApplications(nextApps);
+
+    if (deletingSelectedApp) {
+      beginRelatedDataRequest();
+      emailsRef.current = [];
+      rawEventsRef.current = [];
+      setEmails([]);
+      setRawEvents([]);
+      setTimeline([]);
+      setViewingEmail(null);
+
+      const nextSelected = nextApps[0] ?? null;
+      selectedAppRef.current = nextSelected;
+      setSelectedApp(nextSelected);
+    } else {
+      setSelectedApp((prev) => (prev?.id === app.id ? null : prev));
+    }
+
     const res = await fetch(`/api/applications/${app.id}`, {
       method: "DELETE",
+      credentials: "include",
     });
-    if (!res.ok) return;
-    setApplications((prev) => prev.filter((a) => a.id !== app.id));
-    setSelectedApp((prev) => (prev?.id === app.id ? null : prev));
+    if (res.ok) return;
+
+    const body = await res.json().catch(() => ({}));
+    const msg = body?.error ?? res.statusText;
+    console.error("Failed to delete application:", msg);
+    alert(`Delete failed: ${msg}`);
+    await refetchApplications();
   }
 
   function handleRequestDeleteEmails(toDelete: ApplicationEmail[]) {
@@ -454,37 +517,93 @@ export default function DashboardPage() {
     setShowDeleteEmailsModal(true);
   }
 
-  async function handleConfirmDeleteEmails() {
+  function handleConfirmDeleteEmails() {
     if (emailsToDelete.length === 0) return;
+    const toDelete = emailsToDelete;
     setShowDeleteEmailsModal(false);
+    setEmailsToDelete([]);
 
-    const linkIds = emailsToDelete.map((e) => e.link_id);
+    // Prevent any in-flight related-data fetch from overwriting optimistic UI updates.
+    beginRelatedDataRequest();
 
-    setEmails((prev) => prev.filter((e) => !linkIds.includes(e.link_id)));
+    const linkIds = toDelete.map((e) => e.link_id);
+    const linkIdSet = new Set(linkIds);
+    const emailIdSet = new Set(
+      toDelete
+        .map((e) => Number(e.id))
+        .filter((n) => Number.isInteger(n)),
+    );
 
-    const res = await fetch("/api/emails", {
+    const nextEmails = emailsRef.current.filter((e) => !linkIdSet.has(e.link_id));
+    emailsRef.current = nextEmails;
+    setEmails(nextEmails);
+
+    if (emailIdSet.size > 0) {
+      const nextEvents = rawEventsRef.current.filter(
+        (ev) => ev.email_id == null || !emailIdSet.has(ev.email_id),
+      );
+      rawEventsRef.current = nextEvents;
+      setRawEvents(nextEvents);
+    }
+
+    setViewingEmail((prev) =>
+      prev && linkIdSet.has(prev.link_id) ? null : prev,
+    );
+
+    const currentApp = selectedAppRef.current;
+    const deleteTargetAppId = currentApp?.id ?? null;
+    if (currentApp) {
+      const recalculated = recalculateAppLocally(
+        currentApp,
+        rawEventsRef.current,
+        nextEmails,
+      );
+      setApplications((prev) =>
+        prev.map((a) => (a.id === recalculated.id ? recalculated : a)),
+      );
+      setSelectedApp(recalculated);
+      selectedAppRef.current = recalculated;
+      rebuildTimelineFromEmails(nextEmails);
+    } else {
+      setTimeline([]);
+    }
+
+    fetch("/api/emails", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ link_ids: linkIds }),
-    });
-
-    if (!res.ok) {
-      console.error("Failed to delete emails");
-      return;
-    }
-
-    const result = await res.json().catch(() => null);
-    if (result?.application) {
-      const updated = result.application as Application;
-      setApplications((prev) =>
-        prev.map((a) => (a.id === updated.id ? updated : a)),
-      );
-      setSelectedApp((prev) => (prev?.id === updated.id ? updated : prev));
-    }
-
-    refetchEvents();
-    setEmailsToDelete([]);
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          const msg = errBody?.error ?? res.statusText;
+          throw new Error(msg);
+        }
+        return res.json().catch(() => null);
+      })
+      .then((result) => {
+        if (!result?.application) return;
+        const updated = result.application as Application;
+        setApplications((prev) =>
+          prev.map((a) => (a.id === updated.id ? updated : a)),
+        );
+        setSelectedApp((prev) => (prev?.id === updated.id ? updated : prev));
+        if (selectedAppRef.current?.id === updated.id) {
+          selectedAppRef.current = updated;
+        }
+      })
+      .then(() => {
+        const app = selectedAppRef.current;
+        if (!app || deleteTargetAppId == null || app.id !== deleteTargetAppId) return;
+        return loadRelatedData(app);
+      })
+      .catch((err) => {
+        console.error("Failed to delete emails:", err);
+        const app = selectedAppRef.current;
+        if (!app || deleteTargetAppId == null || app.id !== deleteTargetAppId) return;
+        loadRelatedData(app);
+      });
   }
 
   return (
