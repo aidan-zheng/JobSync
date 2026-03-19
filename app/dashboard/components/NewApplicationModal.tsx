@@ -30,6 +30,13 @@ interface NewApplicationModalProps {
 
 type Mode = "automatic" | "manual";
 
+function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 const EMPTY_FORM = {
   job_url: "",
   company_name: "",
@@ -37,7 +44,7 @@ const EMPTY_FORM = {
   salary_per_hour: "",
   location_type: "" as LocationType | "",
   location: "",
-  date_applied: new Date().toISOString().slice(0, 10),
+  date_applied: getLocalDateString(),
   contact_person: "",
   status: "applied" as ApplicationStatus,
   notes: "",
@@ -101,7 +108,7 @@ export default function NewApplicationModal({
             location_type: form.location_type || null,
             location: form.location.trim() || null,
             date_applied:
-              form.date_applied || new Date().toISOString().slice(0, 10),
+              form.date_applied || getLocalDateString(),
             contact_person: form.contact_person.trim() || null,
             status: form.status,
             notes: form.notes.trim() || null,
