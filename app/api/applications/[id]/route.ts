@@ -1,6 +1,8 @@
+/**
+ * Manages detailed operations for a specific job application: retrieving its derived state, manually updating individual fields, and fully deleting the application alongside its timeline history.
+ */
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from "@/lib/supabase/api-auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireCurrentAppOwner } from "@/lib/supabase/api-auth";
 import type {
   ApplicationStatus,
   ApplicationFieldName,
@@ -17,35 +19,10 @@ export async function GET(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const user = await getApiUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireCurrentAppOwner(request, idNum);
+  if (auth.errorResponse) return auth.errorResponse;
 
-  const admin = createAdminClient();
-  const { data: row, error } = await admin
-    .from("application_current")
-    .select("*")
-    .eq("id", idNum)
-    .single();
-
-  if (error || !row) {
-    return NextResponse.json(
-      { error: "Application not found" },
-      { status: 404 },
-    );
-  }
-
-  const { data: parent } = await admin
-    .from("applications")
-    .select("user_id")
-    .eq("id", row.application_id)
-    .single();
-  if (parent?.user_id !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  return NextResponse.json(row);
+  return NextResponse.json(auth.row);
 }
 
 function buildUpdateAndEvent(
@@ -167,34 +144,9 @@ export async function PUT(
     );
   }
 
-  const user = await getApiUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
-
-  const { data: row, error: fetchError } = await admin
-    .from("application_current")
-    .select("application_id")
-    .eq("id", idNum)
-    .single();
-
-  if (fetchError || !row) {
-    return NextResponse.json(
-      { error: "Application not found" },
-      { status: 404 },
-    );
-  }
-
-  const { data: parent } = await admin
-    .from("applications")
-    .select("user_id")
-    .eq("id", row.application_id)
-    .single();
-  if (parent?.user_id !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireCurrentAppOwner(request, idNum);
+  if (auth.errorResponse) return auth.errorResponse;
+  const { admin, applicationId } = auth;
 
   const { currentUpdate, eventPayload } = buildUpdateAndEvent(field_name, value);
 
@@ -215,7 +167,7 @@ export async function PUT(
   // Build event row in table column order so position-based mapping never swaps source_type and field_name
   const eventTime = new Date().toISOString();
   const eventRow = {
-    application_id: row.application_id,
+    application_id: applicationId,
     email_id: null as number | null,
     field_name: field_name,
     value_text: (eventPayload.value_text as string | undefined) ?? null,
@@ -266,44 +218,9 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const user = await getApiUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
-
-  const { data: row, error: fetchError } = await admin
-    .from("application_current")
-    .select("application_id")
-    .eq("id", idNum)
-    .single();
-
-  if (fetchError || !row) {
-    return NextResponse.json(
-      { error: "Application not found" },
-      { status: 404 },
-    );
-  }
-
-  const applicationId = row.application_id;
-
-  const { data: parent, error: parentError } = await admin
-    .from("applications")
-    .select("user_id")
-    .eq("id", applicationId)
-    .single();
-
-  if (parentError || !parent) {
-    return NextResponse.json(
-      { error: "Application not found" },
-      { status: 404 },
-    );
-  }
-
-  if (parent.user_id !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireCurrentAppOwner(request, idNum);
+  if (auth.errorResponse) return auth.errorResponse;
+  const { admin, applicationId } = auth;
 
   const { data: links, error: linksError } = await admin
     .from("application_email_links")

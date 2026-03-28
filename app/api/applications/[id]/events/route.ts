@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from "@/lib/supabase/api-auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireCurrentAppOwner } from "@/lib/supabase/api-auth";
 
 export async function GET(
   request: NextRequest,
@@ -12,39 +11,14 @@ export async function GET(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const user = await getApiUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
-
-  const { data: row, error: fetchError } = await admin
-    .from("application_current")
-    .select("application_id")
-    .eq("id", idNum)
-    .single();
-
-  if (fetchError || !row) {
-    return NextResponse.json(
-      { error: "Application not found" },
-      { status: 404 },
-    );
-  }
-
-  const { data: parent } = await admin
-    .from("applications")
-    .select("user_id")
-    .eq("id", row.application_id)
-    .single();
-  if (parent?.user_id !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireCurrentAppOwner(request, idNum);
+  if (auth.errorResponse) return auth.errorResponse;
+  const { admin, applicationId } = auth;
 
   const { data: events, error: eventsError } = await admin
     .from("application_field_events")
     .select("*")
-    .eq("application_id", row.application_id)
+    .eq("application_id", applicationId)
     .order("event_time", { ascending: false });
 
   if (eventsError) {

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Briefcase, User } from "lucide-react";
+import { Briefcase, User, Mail } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
@@ -13,7 +13,9 @@ import ApplicationsList from "./components/ApplicationsList";
 import ApplicationDetails from "./components/ApplicationDetails";
 import EmailsTimeline from "./components/EmailsTimeline";
 import EmailViewerModal from "./components/EmailViewerModal";
+import ScanEmailsModal from "./components/ScanEmailsModal";
 import NewApplicationModal from "./components/NewApplicationModal";
+import { extractFieldValue } from "@/lib/applications";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +65,7 @@ export default function DashboardPage() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [viewingEmail, setViewingEmail] = useState<ApplicationEmail | null>(null);
+  const [showScanModal, setShowScanModal] = useState(false);
   const [emailsToDelete, setEmailsToDelete] = useState<ApplicationEmail[]>([]);
   const [showDeleteEmailsModal, setShowDeleteEmailsModal] = useState(false);
   const [appsSelectMode, setAppsSelectMode] = useState(false);
@@ -222,28 +225,9 @@ export default function DashboardPage() {
       if (ev.email_id != null && inactiveEmailIds.has(ev.email_id)) continue;
       seen.add(f);
 
-      switch (f) {
-        case "status":
-          result.status = ev.value_status ?? null;
-          break;
-        case "salary_per_hour":
-          result.salary_per_hour = ev.value_number ?? null;
-          break;
-        case "location_type":
-          result.location_type = ev.value_location_type ?? null;
-          break;
-        case "location":
-          result.location = ev.value_text ?? null;
-          break;
-        case "contact_person":
-          result.contact_person = ev.value_text ?? null;
-          break;
-        case "date_applied":
-          result.date_applied = ev.value_date ?? null;
-          break;
-        case "notes":
-          result.notes = ev.value_text ?? null;
-          break;
+      const value = extractFieldValue(f, ev);
+      if (f !== "salary_yearly") {
+        result[f] = value ?? null;
       }
     }
 
@@ -757,7 +741,7 @@ export default function DashboardPage() {
             ease: "easeInOut",
             type: "spring",
           }}
-          className={`${styles.popup} ${showNewModal || showDeleteModal || showDeleteEmailsModal || showBulkDeleteApplicationsModal ? styles.popupBehindModal : ""}`}
+          className={`${styles.popup} ${showNewModal || showDeleteModal || showDeleteEmailsModal || showScanModal || showBulkDeleteApplicationsModal ? styles.popupBehindModal : ""}`}
         >
           <header className={styles.header}>
             <div className={styles.brandArea}>
@@ -770,6 +754,14 @@ export default function DashboardPage() {
             </div>
 
             <div className={styles.userArea}>
+              <button
+                type="button"
+                className={styles.scanBtn}
+                onClick={() => setShowScanModal(true)}
+              >
+                <Mail size={14} />
+                Scan Emails
+              </button>
               {avatarUrl ? (
                 <img
                   src={avatarUrl}
@@ -990,6 +982,27 @@ export default function DashboardPage() {
         email={viewingEmail}
         onClose={() => setViewingEmail(null)}
         onToggleLink={handleToggleEmailLink}
+      />
+
+      <ScanEmailsModal
+        open={showScanModal}
+        onOpenChange={setShowScanModal}
+        onScanComplete={async () => {
+          // Re-fetch applications
+          const res = await fetch("/api/applications", { credentials: "include" });
+          const data = await res.json().catch(() => []);
+          if (res.ok && Array.isArray(data)) {
+            setApplications(data);
+            // Refresh selected app if it still exists
+            if (selectedApp) {
+              const updated = data.find((a: Application) => a.id === selectedApp.id);
+              if (updated) {
+                setSelectedApp(updated);
+                await loadRelatedData(updated);
+              }
+            }
+          }
+        }}
       />
     </div>
   );

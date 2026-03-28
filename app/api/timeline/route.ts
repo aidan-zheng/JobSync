@@ -1,6 +1,8 @@
+/**
+ * Manages fetching and manual creation of individual field event records representing a specific application's chronological timeline.
+ */
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from "@/lib/supabase/api-auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAppOwner } from "@/lib/supabase/api-auth";
 import type {
   ApplicationFieldName,
   ApplicationStatus,
@@ -35,29 +37,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const user = await getApiUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
-
-  const { data: parent, error: parentError } = await admin
-    .from("applications")
-    .select("id, user_id")
-    .eq("id", applicationId)
-    .single();
-
-  if (parentError || !parent) {
-    return NextResponse.json(
-      { error: "Application not found" },
-      { status: 404 },
-    );
-  }
-
-  if (parent.user_id !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireAppOwner(request, applicationId);
+  if (auth.errorResponse) return auth.errorResponse;
+  const { admin } = auth;
 
   const { data, error } = await admin
     .from("application_field_events")
@@ -88,29 +70,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const user = await getApiUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
-
-  const { data: parent, error: parentError } = await admin
-    .from("applications")
-    .select("id, user_id")
-    .eq("id", applicationId)
-    .single();
-
-  if (parentError || !parent) {
-    return NextResponse.json(
-      { error: "Application not found" },
-      { status: 404 },
-    );
-  }
-
-  if (parent.user_id !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireAppOwner(request, applicationId);
+  if (auth.errorResponse) return auth.errorResponse;
+  const { admin } = auth;
 
   const row = {
     application_id: applicationId,

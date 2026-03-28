@@ -11,6 +11,18 @@ export type LocationType = "remote" | "hybrid" | "on_site";
 
 export type Confidence = "high" | "medium" | "low";
 
+export function parseConfidenceNum(c: Confidence | string | null | undefined): number {
+  if (c === "high") return 3;
+  if (c === "low") return 1;
+  return 2;
+}
+
+export function parseConfidenceString(n: number | null | undefined): Confidence {
+  if (n === 3) return "high";
+  if (n === 1) return "low";
+  return "medium";
+}
+
 export interface Application {
   id: number;
   application_id: number;

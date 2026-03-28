@@ -1,15 +1,15 @@
+/**
+ * Handles fetching the user's list of current applications and creating new applications (both via manual input and automated scraping).
+ */
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from "@/lib/supabase/api-auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAuth } from "@/lib/supabase/api-auth";
+
 import type { ApplicationStatus, LocationType } from "@/types/applications";
 
 export async function GET(request: NextRequest) {
-  const user = await getApiUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
+  const auth = await requireAuth(request);
+  if (auth.errorResponse) return auth.errorResponse;
+  const { user, admin } = auth;
 
   const { data: appIds, error: idsError } = await admin
     .from("applications")
@@ -53,17 +53,17 @@ const MANUAL_DEFAULTS = {
 export type CreateApplicationBody =
   | { mode: "automatic"; job_url?: string }
   | {
-      mode: "manual";
-      company_name?: string;
-      job_title?: string;
-      salary_per_hour?: number | null;
-      location_type?: LocationType | null;
-      location?: string | null;
-      date_applied?: string;
-      contact_person?: string | null;
-      status?: ApplicationStatus;
-      notes?: string | null;
-    };
+    mode: "manual";
+    company_name?: string;
+    job_title?: string;
+    salary_per_hour?: number | null;
+    location_type?: LocationType | null;
+    location?: string | null;
+    date_applied?: string;
+    contact_person?: string | null;
+    status?: ApplicationStatus;
+    notes?: string | null;
+  };
 
 export async function POST(request: NextRequest) {
   let body: CreateApplicationBody;
@@ -109,12 +109,9 @@ export async function POST(request: NextRequest) {
         : MANUAL_DEFAULTS.notes,
   };
 
-  const user = await getApiUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
+  const auth = await requireAuth(request);
+  if (auth.errorResponse) return auth.errorResponse;
+  const { user, admin } = auth;
 
   const jobUrl =
     mode === "automatic" && "job_url" in body && body.job_url

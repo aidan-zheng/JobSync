@@ -13,7 +13,6 @@ import type {
 } from "@/types/applications";
 import {
   STATUS_LABELS,
-  STATUS_COLORS,
   LOCATION_LABELS,
 } from "@/types/applications";
 import styles from "../dashboard.module.css";
@@ -129,6 +128,24 @@ export default function ApplicationDetails({
     setSelectedEmailIds(new Set());
     setSelectMode(false);
   }, [application?.id]);
+
+  useEffect(() => {
+    setSelectedEmailIds((prev) => {
+      if (prev.size === 0) return prev;
+      const activeLinks = new Set(emails.map((e) => e.link_id));
+      const next = new Set<number>();
+      let changed = false;
+      for (const id of prev) {
+        if (activeLinks.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+
+    if (emails.length === 0) {
+      setSelectMode(false);
+    }
+  }, [emails]);
 
   function cancelEdit() {
     setEditingField(null);
@@ -525,8 +542,8 @@ export default function ApplicationDetails({
             type="button"
             className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
             style={{
-              borderColor: STATUS_COLORS[app.status],
-              backgroundColor: STATUS_COLORS[app.status],
+              borderColor: "#404040",
+              backgroundColor: "#404040",
               color: "white",
             }}
             layout

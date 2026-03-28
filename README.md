@@ -1,11 +1,12 @@
 # JobSync
 
-A job application tracker built with Next.js and Supabase. Track applications, log field changes over time, and keep everything in one place.
+A job application tracker built with Next.js and Supabase. Track applications, log field changes over time, sync with Gmail via AI parsing, and keep everything in one place.
 
 ## Tech Stack
 
 - **Next.js 16** (App Router) — React 19, TypeScript
 - **Supabase** — Auth (GitHub + Google OAuth), Postgres database
+- **Groq API** — AI-powered email parsing (Stage 1 relevance check, Stage 2 body parsing)
 - **Tailwind CSS 4** + **shadcn/ui** — styling and UI primitives
 - **Framer Motion** — page transitions and micro-animations
 - **OGL** — WebGL gradient background (`Grainient` component)
@@ -27,24 +28,27 @@ A job application tracker built with Next.js and Supabase. Track applications, l
    NEXT_PUBLIC_SUPABASE_URL=<your supabase project url>
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<your anon key>
    SUPABASE_SERVICE_ROLE_KEY=<your service role key>
+   GROQ_API_KEY=<your groq api key>
+   GOOGLE_CLIENT_ID=<your google oauth client id>
+   GOOGLE_CLIENT_SECRET=<your google oauth client secret>
    ```
 
 3. **Set up the database**
 
    Run these SQL files in the Supabase SQL Editor (in order):
 
+   - `supabase-user-tokens.sql` — stores OAuth access/refresh tokens
    - `supabase-rls-application-current.sql` — RLS policies for `application_current`
    - `supabase-application-field-events.sql` — creates the `application_field_events` table and enums
 
-   The database schema is two main tables:
-   - **`applications`** — one row per application, holds `user_id`, optional `job_url`, timestamps
-   - **`application_current`** — one row per application, holds all the editable job fields (company, title, salary, status, etc.), linked via `application_id` FK
-
-   There's also `application_field_events` for tracking every field change over time (timeline).
+   The database schema is three main tables:
+   - **`applications`** — parent table for tracking applications, holds `user_id` and optional `job_url`
+   - **`application_current`** — holds all current job fields (company, title, salary, status, etc.), linked via `application_id`
+   - **`application_field_events`** — logs every field change over time (source, value, timestamp) for the timeline view
 
 4. **Configure OAuth providers**
 
-   In your Supabase dashboard, enable GitHub and/or Google as auth providers. Set the redirect URL to `http://localhost:3000/auth/callback`.
+   In your Supabase dashboard, enable GitHub and Google as auth providers. Set the redirect URL to `http://localhost:3000/auth/callback`.
 
 5. **Run the dev server**
 
@@ -56,134 +60,66 @@ A job application tracker built with Next.js and Supabase. Track applications, l
 
 ```
 app/
-├── page.tsx                        # Redirects to /dashboard
-├── layout.tsx                      # Root layout (fonts, global CSS)
-├── globals.css                     # Tailwind + shadcn theme + custom vars
-├── login/
-│   ├── page.tsx                    # OAuth login (GitHub / Google)
-│   └── login.module.css
+├── (auth)/login/                   # OAuth login (GitHub / Google)
+├── auth/callback/route.ts          # OAuth callback handler
 ├── dashboard/
-│   ├── page.tsx                    # Main dashboard page
+│   ├── page.tsx                    # Main dashboard with resizable panels
 │   ├── dashboard.module.css
 │   └── components/
-│       ├── ApplicationsList.tsx    # Left panel — searchable/filterable list
-│       ├── ApplicationDetails.tsx  # Center panel — inline-editable fields
-│       ├── EmailsTimeline.tsx      # Right panel — timeline of field changes
-│       └── NewApplicationModal.tsx # Modal for creating applications
-├── auth/
-│   └── callback/route.ts          # OAuth callback handler
+│       ├── ApplicationsList.tsx    # List panel (search, filter, bulk delete)
+│       ├── ApplicationDetails.tsx  # Central detail panel with inline edits
+│       ├── EmailsTimeline.tsx      # Chronological timeline of events/emails
+│       ├── NewApplicationModal.tsx # Manual/Automatic application creation
+│       └── ScanEmailsModal.tsx     # AI email scanner UI
 ├── api/
-│   ├── applications/
-│   │   ├── route.ts               # GET (list) / POST (create)
-│   │   └── [id]/
-│   │       ├── route.ts           # GET / PUT (single-field update) / DELETE
-│   │       └── events/route.ts    # GET field change events (timeline)
-│   ├── emails/route.ts            # Stub — not yet implemented
-│   ├── timeline/route.ts          # Stub — not yet implemented
-│   └── dev/token/route.ts         # Dev-only: grab session token for Postman
-├── test/page.tsx                   # Empty test page
-```
-
-```
-components/
-├── Grainient/                      # WebGL animated gradient background
-│   ├── Grainient.jsx
-│   └── Grainient.css
-└── ui/                             # shadcn/ui components (button, dialog, input, etc.)
-
+│   ├── applications/               # CRUD for applications and events
+│   ├── emails/                     # Linking and unlinking scanned emails
+│   ├── scan-emails/
+│   │   ├── route.ts                # Stage 1: Batch relevance check
+│   │   └── process/route.ts        # Stage 2: Deep parsing + DB update
+│   └── dev/token/route.ts          # Dev utility to grab session tokens
 lib/
-├── utils.ts                        # cn() helper (clsx + tailwind-merge)
-└── supabase/
-    ├── client.ts                   # Browser Supabase client
-    ├── server.ts                   # Server-side Supabase client (cookies)
-    ├── middleware.ts               # Session refresh + auth redirect logic
-    ├── admin.ts                    # Service-role client (bypasses RLS)
-    └── api-auth.ts                 # getApiUser() — supports cookie + Bearer token auth
-
-types/
-└── applications.ts                 # TypeScript types, status/location enums, label maps
+├── applications.ts                 # Core business logic (state recalculation, event dispatch)
+├── gmail.ts                        # Gmail API integration & token management
+├── llm-parser.ts                   # Groq API / LLM parsing logic
+├── supabase/                       # Supabase client / auth utilities
+scripts/
+├── test-llm-confidence.ts          # Verify LLM extraction accuracy
+└── clean-emails.mjs                # Reset email data for testing
 ```
 
-## Pages
+## AI Email Scanner
 
-| Route | What it does |
-|---|---|
-| `/` | Redirects to `/dashboard` |
-| `/login` | OAuth login page (GitHub, Google) |
-| `/dashboard` | Three-panel application tracker |
-| `/auth/callback` | Handles the OAuth redirect from Supabase |
+JobSync features an advanced, two-stage AI email parsing system:
+
+1. **Stage 1 (Relevance)**: We fetch email headers from Gmail and use a fast LLM batch check to see if any match your tracked applications.
+2. **Stage 2 (Body Parsing)**: For relevant emails, we fetch the full body and use a more capable LLM to extract field updates (status changes, interview invites, salary info, etc.).
+3. **Chronological Accuracy**: The system performs a "Bulk Recalculation Phase" after scanning. It looks at all events for an application across its entire history and resets its current state based on the most recent chronological events, ensuring data consistency even when emails arrive out of order.
 
 ## API Routes
 
-All API routes require authentication (cookie session or `Authorization: Bearer <token>` header).
+### User Management
+- `GET /api/dev/token`: Get current session token for external testing (Postman, etc.).
 
-### `GET /api/applications`
+### Applications
+- `GET /api/applications`: List all applications.
+- `POST /api/applications`: Create application (manual or via job URL).
+- `GET /api/applications/:id`: Get detailed data for one application.
+- `PUT /api/applications/:id`: Update a single application field (auto-logs to timeline).
+- `DELETE /api/applications/:id`: Delete an application and all its events.
 
-Returns all applications for the logged-in user (from `application_current`, ordered by `date_applied` descending).
+### AI Scanning
+- `POST /api/scan-emails`: Search Gmail for relevant updates in a date range.
+- `POST /api/scan-emails/process`: Process selected emails, extracting structured updates.
 
-### `POST /api/applications`
+### Emails
+- `PATCH /api/emails`: Toggle `is_active` for an email link (refreshes application state).
+- `DELETE /api/emails`: Permanently delete email links and associated timeline events.
 
-Creates a new application. Body:
+## Timezone Support
 
-```json
-{ "mode": "manual", "company_name": "Acme", "job_title": "Engineer", ... }
-```
+All date inputs (New Application, Scan Dates, etc.) use a custom local timezone formatter to ensure that "today" matches your browser's system clock, avoiding common UTC "future date" bugs in late-night PDT hours.
 
-or
+## Bulk Actions
 
-```json
-{ "mode": "automatic", "job_url": "https://..." }
-```
-
-Automatic mode currently creates a placeholder and stores the URL — scraping is not yet wired up.
-
-### `GET /api/applications/:id`
-
-Returns a single `application_current` row. Checks ownership via the parent `applications` table.
-
-### `PUT /api/applications/:id`
-
-Updates a single field and logs it as a timeline event. Body:
-
-```json
-{ "field_name": "status", "value": "interviewing" }
-```
-
-Supported fields: `salary_per_hour`, `salary_yearly`, `location_type`, `location`, `contact_person`, `status`, `date_applied`, `notes`.
-
-### `DELETE /api/applications/:id`
-
-Deletes the `application_current` row and the parent `applications` row.
-
-### `GET /api/applications/:id/events`
-
-Returns `application_field_events` for a given application (timeline data).
-
-### `GET /api/dev/token`
-
-Dev-only. Returns the current session's access token so you can test API routes in Postman.
-
-### `GET /api/emails` / `POST /api/emails`
-
-Not yet implemented (returns 501).
-
-### `GET /api/timeline` / `POST /api/timeline`
-
-Not yet implemented (returns 501).
-
-## Authentication Flow
-
-1. User clicks "Log in with GitHub/Google" on `/login`
-2. Supabase redirects to the provider, then back to `/auth/callback`
-3. The callback exchanges the code for a session and redirects to `/`
-4. Middleware (`middleware.ts`) runs on every request — refreshes the session cookie and redirects unauthenticated users to `/login`
-5. API routes authenticate via `getApiUser()`, which checks for a Bearer token first, then falls back to cookie-based session
-
-## Database Schema
-
-See `supabase-application-fk.md` for the full relationship breakdown. The short version:
-
-- **`applications`** — `id`, `user_id`, `job_url`, `created_at`, `updated_at`
-- **`application_current`** — `id`, `application_id` (FK to applications), all job detail fields
-- **`application_field_events`** — `id`, `application_id` (FK), `source_type`, `field_name`, typed value columns, `event_time`
-- **`application_emails`** — linked emails (queried directly via Supabase client on the dashboard)
+The dashboard supports bulk selection for both emails (in the Details panel) and applications (in the List panel), allowing for rapid cleanup and project management.

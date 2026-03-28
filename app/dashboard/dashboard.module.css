@@ -475,6 +475,7 @@
     color 0.15s,
     border-color 0.15s;
 }
+
 .detailsDeleteBtn:hover {
   background: rgba(185, 28, 28, 0.08);
   color: #b91c1c;
@@ -491,6 +492,7 @@
   border: none !important;
   cursor: pointer;
 }
+
 .deleteConfirmDeleteBtn:hover {
   background: #991b1b !important;
 }
@@ -1016,11 +1018,9 @@
 .timelineLine {
   width: 2px;
   flex: 1;
-  background: linear-gradient(
-    to bottom,
-    var(--jobsync-border-strong),
-    var(--jobsync-border)
-  );
+  background: linear-gradient(to bottom,
+      var(--jobsync-border-strong),
+      var(--jobsync-border));
   margin: 2px 0;
   border-radius: 1px;
 }
@@ -1737,4 +1737,139 @@
   border-top-color: var(--jobsync-text);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
+}
+
+/* Scan Emails Modal */
+
+.scanBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--jobsync-brand);
+  background: var(--jobsync-brand-soft);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+.scanBtn:hover {
+  background: #d4d4d4;
+}
+
+.scanBtn:active {
+  transform: scale(0.97);
+}
+
+.scanDateFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.scanProgress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.scanProgressText {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+  margin: 0;
+}
+
+.scanProgressHint {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.78rem;
+  color: var(--jobsync-text-muted);
+  margin: 0;
+}
+
+.scanResults {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.scanResultsSummary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.85rem;
+  color: var(--jobsync-text);
+}
+
+.scanResultsIcon {
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.scanUpdatesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--jobsync-border);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.scanUpdateItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 6px;
+}
+
+.scanUpdateSubject {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+}
+
+.scanUpdateFields {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.72rem;
+  color: var(--jobsync-text-muted);
+}
+
+.scanNoResults {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.85rem;
+  color: var(--jobsync-text-muted);
+  text-align: center;
+  padding: 1rem;
+}
+
+.scanError {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(220, 38, 38, 0.06);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 8px;
+  color: #dc2626;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.85rem;
+}
+
+.scanError p {
+  margin: 0;
 }

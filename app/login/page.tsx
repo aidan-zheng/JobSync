@@ -14,10 +14,19 @@ export default function LoginPage() {
   const supabase = createClient();
 
   async function signInWithOAuth(provider: "google" | "github") {
+    const extraOptions =
+      provider === "google"
+        ? {
+            scopes: "https://www.googleapis.com/auth/gmail.readonly",
+            queryParams: { access_type: "offline", prompt: "consent" },
+          }
+        : {};
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        ...extraOptions,
       },
     });
     if (error) {

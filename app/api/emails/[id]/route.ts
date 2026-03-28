@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from "@/lib/supabase/api-auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAuth } from "@/lib/supabase/api-auth";
 
 export async function GET(
   request: NextRequest,
@@ -12,12 +11,9 @@ export async function GET(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const user = await getApiUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const admin = createAdminClient();
+  const auth = await requireAuth(request);
+  if (auth.errorResponse) return auth.errorResponse;
+  const { user, admin } = auth;
 
   const { data: email, error } = await admin
     .from("emails")
