@@ -1,4 +1,4 @@
-# JobSync
+# Pipply
 
 A job application tracker built with Next.js and Supabase. Track applications, log field changes over time, and keep everything in one place.
 
