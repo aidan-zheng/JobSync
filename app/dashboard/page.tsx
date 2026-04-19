@@ -29,6 +29,7 @@ import type {
   ApplicationFieldEvent,
   TimelineEvent,
   ApplicationStatus,
+  LocationType,
 } from "@/types/applications";
 import { STATUS_LABELS, LOCATION_LABELS } from "@/types/applications";
 
@@ -36,7 +37,7 @@ import styles from "./dashboard.module.css";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -59,7 +60,7 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">(
     "all",
   );
-  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<LocationType | "all">("all");
   const [showNewModal, setShowNewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [viewingEmail, setViewingEmail] = useState<ApplicationEmail | null>(null);
@@ -73,10 +74,68 @@ export default function DashboardPage() {
   const [showBulkDeleteApplicationsModal, setShowBulkDeleteApplicationsModal] =
     useState(false);
   const [bulkDeletingApplications, setBulkDeletingApplications] = useState(false);
+  const authUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u));
-  }, [supabase.auth]);
+    let isMounted = true;
+
+    function resetDashboardState() {
+      applicationsRef.current = [];
+      emailsRef.current = [];
+      rawEventsRef.current = [];
+      selectedAppRef.current = null;
+      beginRelatedDataRequest();
+      setApplications([]);
+      setSelectedApp(null);
+      setEmails([]);
+      setRawEvents([]);
+      setTimeline([]);
+      setViewingEmail(null);
+      setShowNewModal(false);
+      setShowDeleteModal(false);
+      setEmailsToDelete([]);
+      setShowDeleteEmailsModal(false);
+      setAppsSelectMode(false);
+      setSelectedApplicationIds(new Set());
+      setApplicationsToDelete([]);
+      setShowBulkDeleteApplicationsModal(false);
+      setBulkDeletingApplications(false);
+    }
+
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      if (!isMounted) return;
+      authUserIdRef.current = u?.id ?? null;
+      setUser(u);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextUser = session?.user ?? null;
+      const nextUserId = nextUser?.id ?? null;
+      const prevUserId = authUserIdRef.current;
+
+      authUserIdRef.current = nextUserId;
+      setUser(nextUser);
+
+      if (prevUserId === nextUserId) return;
+
+      resetDashboardState();
+
+      if (!nextUserId) {
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+
+      window.location.reload();
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router, supabase.auth]);
 
   async function refetchApplications() {
     if (!user) return;
@@ -135,7 +194,7 @@ export default function DashboardPage() {
       valueStr = LOCATION_LABELS[e.value_location_type];
 
     const label = FIELD_LABELS[e.field_name] ?? e.field_name;
-    const val = valueStr || "—";
+    const val = valueStr || "N/A";
     const description = `${label} set to ${val}`;
 
     return {
@@ -763,7 +822,7 @@ export default function DashboardPage() {
             <div className={styles.brandArea}>
               <div className={styles.brand}>
                 <Briefcase className={styles.brandIcon} size={22} aria-hidden />
-                <span className={styles.appName}>JobSync</span>
+                <span className={styles.appName}>Pipply</span>
               </div>
               <span className={styles.headerSep}>|</span>
               <span className={styles.headerSubtitle}>Dashboard</span>
@@ -832,6 +891,7 @@ export default function DashboardPage() {
 
               <Panel id="details" defaultSize="48%" minSize="30%">
                 <ApplicationDetails
+                  key={selectedApp?.id ?? "empty-application"}
                   application={selectedApp}
                   emails={emails}
                   onApplicationUpdated={handleApplicationUpdated}
@@ -869,7 +929,7 @@ export default function DashboardPage() {
               Are you sure you want to delete{" "}
               <strong>
                 {selectedApp?.company_name ?? "this application"}
-                {selectedApp?.job_title ? ` — ${selectedApp.job_title}` : ""}
+                {selectedApp?.job_title ? ` - ${selectedApp.job_title}` : ""}
               </strong>
               ? This action cannot be undone.
             </DialogDescription>
@@ -962,8 +1022,7 @@ export default function DashboardPage() {
               <br />
               <br />
               If you&apos;re not sure, you can unlink the{" "}
-              {emailsToDelete.length === 1 ? "email" : "emails"} instead —
-              unlinking removes their effect on the application without
+              {emailsToDelete.length === 1 ? "email" : "emails"} instead - unlinking removes their effect on the application without
               deleting any data.
             </DialogDescription>
           </DialogHeader>
@@ -994,3 +1053,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

@@ -1,10 +1,22 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Search, Plus, ChevronDown, Check, Trash2 } from "lucide-react";
+import { Search, Plus, Check, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { Application, ApplicationStatus } from "@/types/applications";
-import { STATUS_LABELS, STATUS_COLORS } from "@/types/applications";
+import { formatDateOnly } from "@/lib/date-only";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type {
+  Application,
+  ApplicationStatus,
+  LocationType,
+} from "@/types/applications";
+import { LOCATION_LABELS, STATUS_LABELS, STATUS_COLORS } from "@/types/applications";
 import styles from "../dashboard.module.css";
 
 interface ApplicationsListProps {
@@ -16,14 +28,26 @@ interface ApplicationsListProps {
   onSearchChange: (q: string) => void;
   statusFilter: ApplicationStatus | "all";
   onStatusFilterChange: (s: ApplicationStatus | "all") => void;
-  locationFilter: string;
-  onLocationFilterChange: (l: string) => void;
+  locationFilter: LocationType | "all";
+  onLocationFilterChange: (l: LocationType | "all") => void;
   selectMode: boolean;
   selectedIds: Set<number>;
   onToggleSelectMode: () => void;
   onToggleSelected: (appId: number) => void;
   onDeleteSelected: () => void;
 }
+
+const STATUS_FILTER_ITEMS: ApplicationStatus[] = [
+  "draft",
+  "applied",
+  "interviewing",
+  "offer",
+  "rejected",
+  "withdrawn",
+  "ghosted",
+];
+
+const LOCATION_FILTER_ITEMS: LocationType[] = ["remote", "hybrid", "on_site"];
 
 const COMPANY_COLORS = [
   "#404040",
@@ -88,40 +112,53 @@ export default function ApplicationsList({
       </div>
 
       <div className={styles.filtersRow}>
-        <button
-          type="button"
-          className={styles.filterButton}
-          onClick={() => {
-            const statuses: (ApplicationStatus | "all")[] = [
-              "all",
-              "draft",
-              "applied",
-              "interviewing",
-              "offer",
-              "rejected",
-              "withdrawn",
-              "ghosted",
-            ];
-            const idx = statuses.indexOf(statusFilter);
-            onStatusFilterChange(statuses[(idx + 1) % statuses.length]);
-          }}
+        <Select
+          value={statusFilter}
+          onValueChange={(value) =>
+            onStatusFilterChange(value as ApplicationStatus | "all")
+          }
         >
-          Status:{" "}
-          {statusFilter === "all" ? "All" : STATUS_LABELS[statusFilter]}
-          <ChevronDown size={14} />
-        </button>
-        <button
-          type="button"
-          className={styles.filterButton}
-          onClick={() => {
-            const locations = ["all", "remote", "hybrid", "on_site"];
-            const idx = locations.indexOf(locationFilter);
-            onLocationFilterChange(locations[(idx + 1) % locations.length]);
-          }}
+          <SelectTrigger
+            size="sm"
+            aria-label="Filter by status"
+            className="h-auto justify-start gap-1.5 border-[var(--jobsync-border-strong)] text-[var(--jobsync-text-muted)] bg-transparent px-2.5 py-1.5 text-xs font-medium shadow-none hover:border-[var(--jobsync-brand)] hover:bg-[rgba(0,0,0,0.03)] focus-visible:ring-0"
+          >
+            <span>Status:</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectItem value="all">All</SelectItem>
+            {STATUS_FILTER_ITEMS.map((status) => (
+              <SelectItem key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={locationFilter}
+          onValueChange={(value) =>
+            onLocationFilterChange(value as LocationType | "all")
+          }
         >
-          Location: {locationFilter === "all" ? "All" : locationFilter}
-          <ChevronDown size={14} />
-        </button>
+          <SelectTrigger
+            size="sm"
+            aria-label="Filter by location"
+            className="h-auto justify-start gap-1.5 border-[var(--jobsync-border-strong)] text-[var(--jobsync-text-muted)] bg-transparent px-2.5 py-1.5 text-xs font-medium shadow-none hover:border-[var(--jobsync-brand)] hover:bg-[rgba(0,0,0,0.03)] focus-visible:ring-0"
+          >
+            <span>Location:</span>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectItem value="all">All</SelectItem>
+            {LOCATION_FILTER_ITEMS.map((location) => (
+              <SelectItem key={location} value={location}>
+                {LOCATION_LABELS[location]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className={styles.listSubheader}>
@@ -210,13 +247,13 @@ export default function ApplicationsList({
                           }}
                         >
                           {STATUS_LABELS[app.status]}
-                        </span>
-                        <span className={styles.appDate}>
-                          {new Date(app.date_applied).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
+                      </span>
+                      <span className={styles.appDate}>
+                        {formatDateOnly(app.date_applied, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
                       </div>
                     </div>
                   </div>
@@ -255,7 +292,7 @@ export default function ApplicationsList({
                         {STATUS_LABELS[app.status]}
                       </span>
                       <span className={styles.appDate}>
-                        {new Date(app.date_applied).toLocaleDateString("en-US", {
+                        {formatDateOnly(app.date_applied, {
                           month: "short",
                           day: "numeric",
                         })}

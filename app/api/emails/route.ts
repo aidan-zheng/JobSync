@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/supabase/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getLocalDateInputValue } from "@/lib/date-only";
 import type { Confidence } from "@/types/applications";
 
 function parseConfidence(value: unknown): Confidence {
@@ -260,7 +261,7 @@ async function recalculateApplication(
 
   if (recalculated.status == null) recalculated.status = "applied";
   if (recalculated.date_applied == null) {
-    recalculated.date_applied = new Date().toISOString().slice(0, 10);
+    recalculated.date_applied = getLocalDateInputValue();
   }
   recalculated.updated_at = new Date().toISOString();
 

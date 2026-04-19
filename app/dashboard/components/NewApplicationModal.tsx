@@ -14,6 +14,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Link2, PenLine, Loader2 } from "lucide-react";
+import {
+  APPLICATION_TEXT_LIMITS,
+  getLimitedTextValue,
+} from "@/lib/application-field-limits";
+import { getLocalDateInputValue } from "@/lib/date-only";
 import type {
   Application,
   ApplicationStatus,
@@ -37,7 +42,7 @@ const EMPTY_FORM = {
   salary_per_hour: "",
   location_type: "" as LocationType | "",
   location: "",
-  date_applied: new Date().toISOString().slice(0, 10),
+  date_applied: getLocalDateInputValue(),
   contact_person: "",
   status: "applied" as ApplicationStatus,
   notes: "",
@@ -68,7 +73,29 @@ export default function NewApplicationModal({
     key: K,
     value: (typeof form)[K],
   ) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    const nextValue =
+      typeof value === "string" &&
+      key in APPLICATION_TEXT_LIMITS
+        ? getLimitedTextValue(
+            key as keyof typeof APPLICATION_TEXT_LIMITS,
+            value,
+          )
+        : value;
+
+    setForm((prev) => ({ ...prev, [key]: nextValue }));
+  }
+
+  function renderCharacterHint(field: keyof typeof APPLICATION_TEXT_LIMITS) {
+    const current = form[field].length;
+    const limit = APPLICATION_TEXT_LIMITS[field];
+
+    return (
+      <p
+        className={`${styles.characterHint} ${current >= limit ? styles.characterHintAtLimit : ""}`}
+      >
+        {current} / {limit} characters
+      </p>
+    );
   }
 
   async function handleSubmit() {
@@ -100,8 +127,7 @@ export default function NewApplicationModal({
               : null,
             location_type: form.location_type || null,
             location: form.location.trim() || null,
-            date_applied:
-              form.date_applied || new Date().toISOString().slice(0, 10),
+            date_applied: form.date_applied || getLocalDateInputValue(),
             contact_person: form.contact_person.trim() || null,
             status: form.status,
             notes: form.notes.trim() || null,
@@ -171,7 +197,9 @@ export default function NewApplicationModal({
                 value={form.job_url}
                 onChange={(e) => updateField("job_url", e.target.value)}
                 className={styles.formInput}
+                maxLength={APPLICATION_TEXT_LIMITS.job_url}
               />
+              {renderCharacterHint("job_url")}
               <p className={styles.autoHint}>
                 We&apos;ll scrape the listing and fill in the details for you.
               </p>
@@ -188,7 +216,9 @@ export default function NewApplicationModal({
                   value={form.company_name}
                   onChange={(e) => updateField("company_name", e.target.value)}
                   className={styles.formInput}
+                  maxLength={APPLICATION_TEXT_LIMITS.company_name}
                 />
+                {renderCharacterHint("company_name")}
               </div>
 
               <div className={styles.formField}>
@@ -201,7 +231,9 @@ export default function NewApplicationModal({
                   value={form.job_title}
                   onChange={(e) => updateField("job_title", e.target.value)}
                   className={styles.formInput}
+                  maxLength={APPLICATION_TEXT_LIMITS.job_title}
                 />
+                {renderCharacterHint("job_title")}
               </div>
 
               <div className={styles.formField}>
@@ -274,7 +306,9 @@ export default function NewApplicationModal({
                   value={form.location}
                   onChange={(e) => updateField("location", e.target.value)}
                   className={styles.formInput}
+                  maxLength={APPLICATION_TEXT_LIMITS.location}
                 />
+                {renderCharacterHint("location")}
               </div>
 
               <div className={styles.formField}>
@@ -302,7 +336,9 @@ export default function NewApplicationModal({
                     updateField("contact_person", e.target.value)
                   }
                   className={styles.formInput}
+                  maxLength={APPLICATION_TEXT_LIMITS.contact_person}
                 />
+                {renderCharacterHint("contact_person")}
               </div>
 
               <div className={styles.formFieldFull}>
@@ -316,7 +352,9 @@ export default function NewApplicationModal({
                   value={form.notes}
                   onChange={(e) => updateField("notes", e.target.value)}
                   className={styles.formInput}
+                  maxLength={APPLICATION_TEXT_LIMITS.notes}
                 />
+                {renderCharacterHint("notes")}
               </div>
             </div>
           )}

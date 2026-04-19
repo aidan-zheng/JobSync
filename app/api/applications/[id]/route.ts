@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/supabase/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getLocalDateInputValue } from "@/lib/date-only";
+import {
+  APPLICATION_TEXT_LIMITS,
+  isWithinTextLimit,
+} from "@/lib/application-field-limits";
 import type {
   ApplicationStatus,
   ApplicationFieldName,
@@ -113,7 +118,7 @@ function buildUpdateAndEvent(
     case "date_applied": {
       const v = value === "" || value == null ? null : String(value);
       return {
-        currentUpdate: { date_applied: v ?? new Date().toISOString().slice(0, 10) },
+        currentUpdate: { date_applied: v ?? getLocalDateInputValue() },
         eventPayload: { ...eventPayload, value_date: v },
       };
     }
@@ -165,6 +170,29 @@ export async function PUT(
       { error: "Missing or invalid field_name" },
       { status: 400 },
     );
+  }
+
+  if (
+    (field_name === "location" ||
+      field_name === "contact_person" ||
+      field_name === "notes") &&
+    typeof value === "string"
+  ) {
+    const limitField =
+      field_name === "location"
+        ? "location"
+        : field_name === "contact_person"
+          ? "contact_person"
+          : "notes";
+
+    if (!isWithinTextLimit(limitField, value)) {
+      return NextResponse.json(
+        {
+          error: `${field_name.replaceAll("_", " ")} must be ${APPLICATION_TEXT_LIMITS[limitField]} characters or fewer`,
+        },
+        { status: 400 },
+      );
+    }
   }
 
   const user = await getApiUser(request);

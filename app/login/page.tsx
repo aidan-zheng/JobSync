@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 import styles from "./login.module.css";
 import Grainient from "@/components/Grainient/Grainient";
@@ -11,7 +12,30 @@ import { Briefcase } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
+
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!isMounted || !user) return;
+      router.replace("/dashboard");
+      router.refresh();
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) return;
+      router.replace("/dashboard");
+      router.refresh();
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router, supabase.auth]);
 
   async function signInWithOAuth(provider: "google" | "github") {
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -75,11 +99,11 @@ export default function LoginPage() {
       >
         <div className={styles.brand}>
           <Briefcase className={styles.brandIcon} size={28} aria-hidden />
-          <span className={styles.appName}>JobSync</span>
+          <span className={styles.appName}>Pipply</span>
         </div>
 
         <section className={styles.welcomeSection}>
-          <h1 className={styles.welcomeTitle}>Welcome to JobSync!</h1>
+          <h1 className={styles.welcomeTitle}>Welcome to Pipply!</h1>
           <p className={styles.welcomeSubtitle}>
             Manage your job applications with ease in one place.
           </p>

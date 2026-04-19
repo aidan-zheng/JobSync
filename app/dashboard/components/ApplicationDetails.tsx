@@ -4,6 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Mail, Loader2, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  APPLICATION_TEXT_LIMITS,
+  getLimitedTextValue,
+} from "@/lib/application-field-limits";
+import { formatDateOnly, getLocalDateInputValue } from "@/lib/date-only";
 import type {
   Application,
   ApplicationEmail,
@@ -33,6 +38,22 @@ function SkeletonBar() {
       animate={{ opacity: [0.4, 0.8, 0.4] }}
       transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
     />
+  );
+}
+
+function CharacterHint({
+  current,
+  limit,
+}: {
+  current: number;
+  limit: number;
+}) {
+  return (
+    <span
+      className={`${styles.characterHint} ${current >= limit ? styles.characterHintAtLimit : ""}`}
+    >
+      {current} / {limit} characters
+    </span>
   );
 }
 
@@ -122,17 +143,22 @@ export default function ApplicationDetails({
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
 
-  useEffect(() => {
-    setOptimisticApp(null);
-    setEditingField(null);
-    setEditValue("");
-    setSelectedEmailIds(new Set());
-    setSelectMode(false);
-  }, [application?.id]);
-
   function cancelEdit() {
     setEditingField(null);
     setEditValue("");
+  }
+
+  function getEditLimit(fieldName: ApplicationFieldName) {
+    switch (fieldName) {
+      case "location":
+        return APPLICATION_TEXT_LIMITS.location;
+      case "contact_person":
+        return APPLICATION_TEXT_LIMITS.contact_person;
+      case "notes":
+        return APPLICATION_TEXT_LIMITS.notes;
+      default:
+        return null;
+    }
   }
 
   if (!application) {
@@ -249,13 +275,11 @@ export default function ApplicationDetails({
       value: app.contact_person || "N/A",
       fieldName: "contact_person",
       label2: "Date Applied",
-      value2: app.date_applied
-        ? new Date(app.date_applied).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })
-        : "N/A",
+      value2: formatDateOnly(app.date_applied, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
       fieldName2: "date_applied",
     },
     {
@@ -288,9 +312,16 @@ export default function ApplicationDetails({
             <textarea
               className={styles.fieldInput}
               value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
+              onChange={(e) =>
+                setEditValue(getLimitedTextValue("notes", e.target.value))
+              }
               rows={3}
               autoFocus
+              maxLength={APPLICATION_TEXT_LIMITS.notes}
+            />
+            <CharacterHint
+              current={editValue.length}
+              limit={APPLICATION_TEXT_LIMITS.notes}
             />
             <button
               type="button"
@@ -407,7 +438,7 @@ export default function ApplicationDetails({
       if (isEditing) {
         const raw =
           app.date_applied?.slice(0, 10) ||
-          new Date().toISOString().slice(0, 10);
+          getLocalDateInputValue();
         return (
           <div className={styles.fieldEditWrap}>
             <input
@@ -442,16 +473,37 @@ export default function ApplicationDetails({
     if (isEditing) {
       const isNum =
         fieldName === "salary_per_hour" || fieldName === "salary_yearly";
+      const limit = getEditLimit(fieldName);
+      const limitedField =
+        fieldName === "location"
+          ? "location"
+          : fieldName === "contact_person"
+            ? "contact_person"
+            : null;
+
       return (
         <div className={styles.fieldEditWrap}>
           <input
             type={isNum ? "number" : "text"}
             className={styles.fieldInput}
             value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+            onChange={(e) =>
+              setEditValue(
+                limitedField == null
+                  ? e.target.value
+                  : getLimitedTextValue(
+                      limitedField,
+                      e.target.value,
+                    ),
+              )
+            }
             placeholder={isNum ? "e.g. 45" : ""}
             autoFocus
+            maxLength={limit ?? undefined}
           />
+          {limit != null && (
+            <CharacterHint current={editValue.length} limit={limit} />
+          )}
           <button
             type="button"
             className={styles.fieldCancelBtn}
@@ -507,7 +559,7 @@ export default function ApplicationDetails({
       <div className={styles.detailsPanelInner}>
         <div className={styles.detailsHeader}>
           <h2 className={styles.detailsTitle}>
-            {app.company_name ?? "Unknown company"} &mdash;{" "}
+            {app.company_name ?? "Unknown company"} {" - "}
             {app.job_title ?? "Unknown role"}
           </h2>
           <button

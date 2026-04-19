@@ -501,6 +501,9 @@
   color: var(--jobsync-text);
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
   line-height: 1.3;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .detailsStatusPill {
@@ -605,9 +608,10 @@
 
 .fieldValueRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   min-height: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .fieldValueRow .fieldValue,
@@ -630,13 +634,15 @@
 }
 
 .fieldValue {
+  flex: 1 1 12rem;
+  min-width: 0;
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--jobsync-text);
-  overflow-wrap: break-word;
-  word-break: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fieldEmpty {
@@ -657,7 +663,7 @@
   border-radius: 6px;
   transition: background 0.12s;
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
-  align-self: center;
+  align-self: flex-start;
 }
 
 .editBtn:hover {
@@ -666,9 +672,23 @@
 
 .fieldEditWrap {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   flex-wrap: wrap;
+  width: 100%;
+}
+
+.characterHint {
+  width: 100%;
+  font-size: 0.72rem;
+  color: var(--jobsync-text-muted);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  line-height: 1.3;
+}
+
+.characterHintAtLimit {
+  color: #b45309;
+  font-weight: 600;
 }
 
 .fieldInput,
@@ -1265,6 +1285,7 @@
 
 .modalContent {
   max-width: 540px;
+  width: min(540px, calc(100vw - 2rem));
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
   border-radius: 16px !important;
   padding: 0 !important;
@@ -1293,6 +1314,8 @@
   color: var(--jobsync-text-muted);
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
   line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .modeToggle {
@@ -1422,6 +1445,8 @@
 .modalFooter {
   padding: 0.75rem 1.5rem 1.25rem;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .submitBtn {
