@@ -60,20 +60,27 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">(
     "all",
   );
-  const [locationFilter, setLocationFilter] = useState<LocationType | "all">("all");
+  const [locationFilter, setLocationFilter] = useState<LocationType | "all">(
+    "all",
+  );
   const [showNewModal, setShowNewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [viewingEmail, setViewingEmail] = useState<ApplicationEmail | null>(null);
+  const [viewingEmail, setViewingEmail] = useState<ApplicationEmail | null>(
+    null,
+  );
   const [emailsToDelete, setEmailsToDelete] = useState<ApplicationEmail[]>([]);
   const [showDeleteEmailsModal, setShowDeleteEmailsModal] = useState(false);
   const [appsSelectMode, setAppsSelectMode] = useState(false);
-  const [selectedApplicationIds, setSelectedApplicationIds] = useState<Set<number>>(
-    () => new Set(),
-  );
-  const [applicationsToDelete, setApplicationsToDelete] = useState<Application[]>([]);
+  const [selectedApplicationIds, setSelectedApplicationIds] = useState<
+    Set<number>
+  >(() => new Set());
+  const [applicationsToDelete, setApplicationsToDelete] = useState<
+    Application[]
+  >([]);
   const [showBulkDeleteApplicationsModal, setShowBulkDeleteApplicationsModal] =
     useState(false);
-  const [bulkDeletingApplications, setBulkDeletingApplications] = useState(false);
+  const [bulkDeletingApplications, setBulkDeletingApplications] =
+    useState(false);
   const authUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -310,7 +317,8 @@ export default function DashboardPage() {
       ...app,
       status: (result.status as ApplicationStatus) ?? "applied",
       salary_per_hour: (result.salary_per_hour as number | null) ?? null,
-      location_type: (result.location_type as Application["location_type"]) ?? null,
+      location_type:
+        (result.location_type as Application["location_type"]) ?? null,
       location: (result.location as string | null) ?? null,
       contact_person: (result.contact_person as string | null) ?? null,
       date_applied: (result.date_applied as string) ?? app.date_applied,
@@ -417,7 +425,9 @@ export default function DashboardPage() {
         (ev) => ev.email_id == null || !inactiveIds.has(ev.email_id),
       );
       const linkedEmails = currentEmails.filter((e) => e.linked);
-      setTimeline(buildTimeline(linkedEmails, filteredEvents, selectedApp.application_id));
+      setTimeline(
+        buildTimeline(linkedEmails, filteredEvents, selectedApp.application_id),
+      );
     }
   }
 
@@ -473,7 +483,9 @@ export default function DashboardPage() {
       (ev) => ev.email_id == null || !inactiveEmailIds.has(ev.email_id),
     );
     const linkedEmails = nextEmails.filter((e) => e.linked);
-    setTimeline(buildTimeline(linkedEmails, filteredEvents, app.application_id));
+    setTimeline(
+      buildTimeline(linkedEmails, filteredEvents, app.application_id),
+    );
   }
 
   function handleToggleEmailLink(email: ApplicationEmail) {
@@ -500,7 +512,11 @@ export default function DashboardPage() {
     const app = selectedAppRef.current;
     const events = rawEventsRef.current;
     if (app) {
-      const recalculated = recalculateAppLocally(app, events, emailsRef.current);
+      const recalculated = recalculateAppLocally(
+        app,
+        events,
+        emailsRef.current,
+      );
       setApplications((prev) =>
         prev.map((a) => (a.id === recalculated.id ? recalculated : a)),
       );
@@ -531,7 +547,11 @@ export default function DashboardPage() {
         const latestApp = selectedAppRef.current;
         const latestEvents = rawEventsRef.current;
         if (latestApp) {
-          const revertedApp = recalculateAppLocally(latestApp, latestEvents, emailsRef.current);
+          const revertedApp = recalculateAppLocally(
+            latestApp,
+            latestEvents,
+            emailsRef.current,
+          );
           setApplications((prev) =>
             prev.map((a) => (a.id === revertedApp.id ? revertedApp : a)),
           );
@@ -695,12 +715,12 @@ export default function DashboardPage() {
     const linkIds = toDelete.map((e) => e.link_id);
     const linkIdSet = new Set(linkIds);
     const emailIdSet = new Set(
-      toDelete
-        .map((e) => Number(e.id))
-        .filter((n) => Number.isInteger(n)),
+      toDelete.map((e) => Number(e.id)).filter((n) => Number.isInteger(n)),
     );
 
-    const nextEmails = emailsRef.current.filter((e) => !linkIdSet.has(e.link_id));
+    const nextEmails = emailsRef.current.filter(
+      (e) => !linkIdSet.has(e.link_id),
+    );
     emailsRef.current = nextEmails;
     setEmails(nextEmails);
 
@@ -761,13 +781,15 @@ export default function DashboardPage() {
       })
       .then(() => {
         const app = selectedAppRef.current;
-        if (!app || deleteTargetAppId == null || app.id !== deleteTargetAppId) return;
+        if (!app || deleteTargetAppId == null || app.id !== deleteTargetAppId)
+          return;
         return loadRelatedData(app);
       })
       .catch((err) => {
         console.error("Failed to delete emails:", err);
         const app = selectedAppRef.current;
-        if (!app || deleteTargetAppId == null || app.id !== deleteTargetAppId) return;
+        if (!app || deleteTargetAppId == null || app.id !== deleteTargetAppId)
+          return;
         loadRelatedData(app);
       });
   }
@@ -974,7 +996,7 @@ export default function DashboardPage() {
                 <strong>
                   {applicationsToDelete[0]?.company_name ?? "this application"}
                   {applicationsToDelete[0]?.job_title
-                    ? ` â€” ${applicationsToDelete[0].job_title}`
+                    ? ` - ${applicationsToDelete[0].job_title}`
                     : ""}
                 </strong>
               ) : (
@@ -996,7 +1018,9 @@ export default function DashboardPage() {
             <Button
               className={styles.deleteConfirmDeleteBtn}
               onClick={handleConfirmBulkDeleteApplications}
-              disabled={bulkDeletingApplications || applicationsToDelete.length === 0}
+              disabled={
+                bulkDeletingApplications || applicationsToDelete.length === 0
+              }
             >
               Delete permanently
             </Button>
@@ -1004,11 +1028,17 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showDeleteEmailsModal} onOpenChange={setShowDeleteEmailsModal}>
+      <Dialog
+        open={showDeleteEmailsModal}
+        onOpenChange={setShowDeleteEmailsModal}
+      >
         <DialogContent className={styles.modalContent}>
           <DialogHeader className={styles.modalHeader}>
             <DialogTitle className={styles.modalTitle}>
-              Delete {emailsToDelete.length === 1 ? "Email" : `${emailsToDelete.length} Emails`}
+              Delete{" "}
+              {emailsToDelete.length === 1
+                ? "Email"
+                : `${emailsToDelete.length} Emails`}
             </DialogTitle>
             <DialogDescription className={styles.modalDesc}>
               This will permanently delete{" "}
@@ -1022,8 +1052,9 @@ export default function DashboardPage() {
               <br />
               <br />
               If you&apos;re not sure, you can unlink the{" "}
-              {emailsToDelete.length === 1 ? "email" : "emails"} instead - unlinking removes their effect on the application without
-              deleting any data.
+              {emailsToDelete.length === 1 ? "email" : "emails"} instead -
+              unlinking removes their effect on the application without deleting
+              any data.
             </DialogDescription>
           </DialogHeader>
 
@@ -1053,4 +1084,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
