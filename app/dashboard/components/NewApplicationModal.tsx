@@ -19,6 +19,10 @@ import {
   getLimitedTextValue,
 } from "@/lib/application-field-limits";
 import { getLocalDateInputValue } from "@/lib/date-only";
+import {
+  getSalaryValidationError,
+  parseOptionalNumber,
+} from "@/lib/salary-validation";
 import type {
   Application,
   ApplicationStatus,
@@ -111,6 +115,13 @@ export default function NewApplicationModal({
         setError("Company name and job title are required.");
         return;
       }
+
+      const salaryPerHour = parseOptionalNumber(form.salary_per_hour);
+      const salaryValidationError = getSalaryValidationError(salaryPerHour);
+      if (salaryValidationError) {
+        setError(salaryValidationError);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -122,9 +133,7 @@ export default function NewApplicationModal({
             mode: "manual" as const,
             company_name: form.company_name.trim(),
             job_title: form.job_title.trim(),
-            salary_per_hour: form.salary_per_hour
-              ? Number(form.salary_per_hour)
-              : null,
+            salary_per_hour: parseOptionalNumber(form.salary_per_hour) ?? null,
             location_type: form.location_type || null,
             location: form.location.trim() || null,
             date_applied: form.date_applied || getLocalDateInputValue(),
@@ -238,11 +247,12 @@ export default function NewApplicationModal({
 
               <div className={styles.formField}>
                 <Label htmlFor="salary" className={styles.formLabel}>
-                  Salary / Hour
+                  Hourly Salary (0 or more)
                 </Label>
                 <Input
                   id="salary"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="e.g. 45"
                   value={form.salary_per_hour}
                   onChange={(e) =>

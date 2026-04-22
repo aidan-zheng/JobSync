@@ -6,6 +6,10 @@ import {
   APPLICATION_TEXT_LIMITS,
   isWithinTextLimit,
 } from "@/lib/application-field-limits";
+import {
+  getSalaryValidationError,
+  parseOptionalNumber,
+} from "@/lib/salary-validation";
 import type { ApplicationStatus, LocationType } from "@/types/applications";
 
 export async function GET(request: NextRequest) {
@@ -110,12 +114,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const salaryPerHour = parseOptionalNumber(manual.salary_per_hour);
+  const salaryValidationError =
+    manual.salary_per_hour !== undefined
+      ? getSalaryValidationError(salaryPerHour)
+      : null;
+  if (salaryValidationError) {
+    return NextResponse.json(
+      { error: salaryValidationError },
+      { status: 400 },
+    );
+  }
+
   const row = {
     company_name: manual.company_name?.trim() ?? MANUAL_DEFAULTS.company_name,
     job_title: manual.job_title?.trim() ?? MANUAL_DEFAULTS.job_title,
     salary_per_hour:
       manual.salary_per_hour !== undefined
-        ? manual.salary_per_hour
+        ? salaryPerHour
         : MANUAL_DEFAULTS.salary_per_hour,
     location_type:
       manual.location_type !== undefined
