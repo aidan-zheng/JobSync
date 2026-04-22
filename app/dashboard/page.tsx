@@ -82,16 +82,25 @@ export default function DashboardPage() {
   const [bulkDeletingApplications, setBulkDeletingApplications] =
     useState(false);
   const authUserIdRef = useRef<string | null>(null);
+  const authReadyRef = useRef(false);
+  const applicationsRequestIdRef = useRef(0);
+
+  function beginApplicationsRequest(): number {
+    applicationsRequestIdRef.current += 1;
+    return applicationsRequestIdRef.current;
+  }
 
   useEffect(() => {
     let isMounted = true;
 
     function resetDashboardState() {
+      beginApplicationsRequest();
       applicationsRef.current = [];
       emailsRef.current = [];
       rawEventsRef.current = [];
       selectedAppRef.current = null;
       beginRelatedDataRequest();
+      setLoading(true);
       setApplications([]);
       setSelectedApp(null);
       setEmails([]);
@@ -109,17 +118,18 @@ export default function DashboardPage() {
       setBulkDeletingApplications(false);
     }
 
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (!isMounted) return;
-      authUserIdRef.current = u?.id ?? null;
-      setUser(u);
-    });
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       const nextUser = session?.user ?? null;
       const nextUserId = nextUser?.id ?? null;
+
+      if (!authReadyRef.current) {
+        authUserIdRef.current = nextUserId;
+        setUser(nextUser);
+        return;
+      }
+
       const prevUserId = authUserIdRef.current;
 
       authUserIdRef.current = nextUserId;
@@ -131,11 +141,15 @@ export default function DashboardPage() {
 
       if (!nextUserId) {
         router.replace("/login");
-        router.refresh();
         return;
       }
+    });
 
-      window.location.reload();
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      if (!isMounted) return;
+      authUserIdRef.current = u?.id ?? null;
+      authReadyRef.current = true;
+      setUser(u);
     });
 
     return () => {
@@ -147,9 +161,18 @@ export default function DashboardPage() {
   async function refetchApplications() {
     if (!user) return;
 
+    const requestId = beginApplicationsRequest();
+    const userId = user.id;
     setLoading(true);
     const res = await fetch("/api/applications", { credentials: "include" });
     const data = await res.json().catch(() => []);
+
+    if (
+      requestId !== applicationsRequestIdRef.current ||
+      authUserIdRef.current !== userId
+    ) {
+      return;
+    }
 
     if (res.ok && Array.isArray(data)) {
       applicationsRef.current = data;
@@ -161,6 +184,7 @@ export default function DashboardPage() {
         return prev;
       });
     }
+
     setLoading(false);
   }
 
@@ -433,8 +457,7 @@ export default function DashboardPage() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
+    window.location.assign("/login");
   }
 
   const displayName =

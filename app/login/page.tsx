@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import styles from "./login.module.css";
 import Grainient from "@/components/Grainient/Grainient";
@@ -13,22 +13,32 @@ import { Briefcase } from "lucide-react";
 export default function LoginPage() {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
+  const authReadyRef = useRef(false);
+  const redirectingRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!isMounted || !user) return;
+    function goToDashboard() {
+      if (redirectingRef.current) return;
+      redirectingRef.current = true;
       router.replace("/dashboard");
       router.refresh();
-    });
+    }
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!authReadyRef.current) return;
       if (!session?.user) return;
-      router.replace("/dashboard");
-      router.refresh();
+      goToDashboard();
+    });
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!isMounted) return;
+      authReadyRef.current = true;
+      if (!user) return;
+      goToDashboard();
     });
 
     return () => {
