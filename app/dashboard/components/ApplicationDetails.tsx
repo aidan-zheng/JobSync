@@ -9,6 +9,10 @@ import {
   getLimitedTextValue,
 } from "@/lib/application-field-limits";
 import { formatDateOnly, getLocalDateInputValue } from "@/lib/date-only";
+import {
+  getSalaryValidationError,
+  parseOptionalNumber,
+} from "@/lib/salary-validation";
 import type {
   Application,
   ApplicationEmail,
@@ -178,14 +182,20 @@ export default function ApplicationDetails({
 
     const rawValue =
       field_name === "salary_per_hour" || field_name === "salary_yearly"
-        ? editValue === "" || editValue === "N/A"
-          ? null
-          : Number(editValue)
+        ? parseOptionalNumber(editValue === "N/A" ? "" : editValue)
         : field_name === "date_applied"
           ? editValue || null
           : editValue === "N/A" || editValue === ""
             ? null
             : editValue;
+
+    if (
+      (field_name === "salary_per_hour" || field_name === "salary_yearly") &&
+      getSalaryValidationError(rawValue as number | null | undefined)
+    ) {
+      alert(getSalaryValidationError(rawValue as number | null | undefined));
+      return;
+    }
 
     let currentValue: string | number | null = null;
     if (field_name === "salary_per_hour") currentValue = application.salary_per_hour ?? null;
@@ -258,7 +268,7 @@ export default function ApplicationDetails({
     isStatus?: boolean;
   }[] = [
     {
-      label: "Salary / Hour",
+      label: "Hourly Salary (0 or more)",
       value: app.salary_per_hour != null ? `$${app.salary_per_hour}` : "N/A",
       fieldName: "salary_per_hour",
     },
@@ -484,7 +494,7 @@ export default function ApplicationDetails({
       return (
         <div className={styles.fieldEditWrap}>
           <input
-            type={isNum ? "number" : "text"}
+            type="text"
             className={styles.fieldInput}
             value={editValue}
             onChange={(e) =>
@@ -499,6 +509,7 @@ export default function ApplicationDetails({
             }
             placeholder={isNum ? "e.g. 45" : ""}
             autoFocus
+            inputMode={isNum ? "decimal" : undefined}
             maxLength={limit ?? undefined}
           />
           {limit != null && (

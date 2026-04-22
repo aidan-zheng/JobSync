@@ -6,6 +6,10 @@ import {
   APPLICATION_TEXT_LIMITS,
   isWithinTextLimit,
 } from "@/lib/application-field-limits";
+import {
+  getSalaryValidationError,
+  parseOptionalNumber,
+} from "@/lib/salary-validation";
 import type {
   ApplicationStatus,
   ApplicationFieldName,
@@ -190,6 +194,17 @@ export async function PUT(
         {
           error: `${field_name.replaceAll("_", " ")} must be ${APPLICATION_TEXT_LIMITS[limitField]} characters or fewer`,
         },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (field_name === "salary_per_hour" || field_name === "salary_yearly") {
+    const salaryValue = parseOptionalNumber(value);
+    const salaryValidationError = getSalaryValidationError(salaryValue);
+    if (salaryValidationError) {
+      return NextResponse.json(
+        { error: salaryValidationError },
         { status: 400 },
       );
     }
