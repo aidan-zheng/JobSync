@@ -180,7 +180,7 @@ export default function DashboardPage() {
   }, [router, supabase.auth]);
 
   async function refetchApplications() {
-    if (!user) return;
+    if (!user) return [];
 
     const requestId = beginApplicationsRequest();
     const userId = user.id;
@@ -192,7 +192,7 @@ export default function DashboardPage() {
       requestId !== applicationsRequestIdRef.current ||
       authUserIdRef.current !== userId
     ) {
-      return;
+      return [];
     }
 
     if (res.ok && Array.isArray(data)) {
@@ -202,13 +202,16 @@ export default function DashboardPage() {
       const firstApp = data[0] ?? null;
       setSelectedApp((prev) => {
         if (data.length > 0 && !prev) return firstApp;
-        if (prev && !data.some((a: Application) => a.id === prev?.id))
-          return firstApp;
+        if (prev) {
+          const updated = data.find((a: Application) => a.id === prev.id);
+          return updated ?? firstApp;
+        }
         return prev;
       });
     }
 
     setLoading(false);
+    return res.ok && Array.isArray(data) ? data : [];
   }
 
   useEffect(() => {
@@ -345,16 +348,19 @@ export default function DashboardPage() {
       }
     }
 
+    // Default values if no active events exist for these fields
+    const status = (result.status as ApplicationStatus) ?? "applied";
+    const date_applied = (result.date_applied as string) ?? new Date().toISOString().slice(0, 10);
+
     return {
       ...app,
-      status: (result.status as ApplicationStatus) ?? app.status,
-      salary_per_hour: (result.salary_per_hour as number | null) ?? app.salary_per_hour,
-      location_type:
-        (result.location_type as Application["location_type"]) ?? app.location_type,
-      location: (result.location as string | null) ?? app.location,
-      contact_person: (result.contact_person as string | null) ?? app.contact_person,
-      date_applied: (result.date_applied as string) ?? app.date_applied,
-      notes: (result.notes as string | null) ?? app.notes,
+      status,
+      salary_per_hour: (result.salary_per_hour as number | null) ?? null,
+      location_type: (result.location_type as Application["location_type"]) ?? null,
+      location: (result.location as string | null) ?? null,
+      contact_person: (result.contact_person as string | null) ?? null,
+      date_applied,
+      notes: (result.notes as string | null) ?? null,
       updated_at: new Date().toISOString(),
     };
   }
@@ -539,7 +545,7 @@ export default function DashboardPage() {
 
     if (toggleCooldownRef.current.has(linkId)) return;
     toggleCooldownRef.current.add(linkId);
-    setTimeout(() => toggleCooldownRef.current.delete(linkId), 600);
+    setTimeout(() => toggleCooldownRef.current.delete(linkId), 350);
 
     const newActive = !email.linked;
     const nextEmails = emails.map((e) =>
@@ -976,7 +982,11 @@ export default function DashboardPage() {
               <Separator className={styles.resizeHandle} />
 
               <Panel id="sidebar" defaultSize="30%" minSize="20%" maxSize="40%">
-                <EmailsTimeline timeline={timeline} isLoading={relatedDataLoading} />
+                <EmailsTimeline 
+                  applicationId={selectedApp?.id ?? ""}
+                  timeline={timeline} 
+                  isLoading={relatedDataLoading} 
+                />
               </Panel>
             </Group>
           </div>
@@ -1140,9 +1150,10 @@ export default function DashboardPage() {
         onScanComplete={async () => {
           // invalidate cache since scan might have affected any application
           setRelatedDataCache({});
-          await refetchApplications();
+          const nextApps = await refetchApplications();
           // refresh related data for the currently selected app
-          const app = selectedAppRef.current;
+          const currentId = selectedAppRef.current?.id;
+          const app = (currentId && nextApps) ? nextApps.find((a: Application) => a.id === currentId) : null;
           if (app) {
             await loadRelatedData(app, true);
           }

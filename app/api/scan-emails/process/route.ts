@@ -74,101 +74,105 @@ export async function POST(request: NextRequest) {
   const updates: ScanUpdate[] = [];
   const processedAppIds = new Set<number>();
 
-  for (const selected of deduplicatedSelectedEmails) {
-    try {
-      const message = await getMessage(accessToken, selected.messageId);
-      const appData = appDataList.get(selected.application_id) || { status: "applied", contact_person: null };
-
-      const parsed = await parseEmailBody(
-        message.subject,
-        message.from,
-        message.body,
-        {
-          company_name: selected.company_name,
-          job_title: selected.job_title,
-          status: appData.status,
-          contact_person: appData.contact_person as string | null,
-        },
-      );
-
-      console.log(`[Process] Parsed output for msg ${selected.messageId}:`, parsed);
-      console.log(`[Process] Message body length:`, message.body.length);
-
-      let emailReceivedAt;
+  const CONCURRENCY_LIMIT = 5;
+  for (let i = 0; i < deduplicatedSelectedEmails.length; i += CONCURRENCY_LIMIT) {
+    const chunk = deduplicatedSelectedEmails.slice(i, i + CONCURRENCY_LIMIT);
+    
+    await Promise.all(chunk.map(async (selected) => {
       try {
-        emailReceivedAt = new Date(message.date).toISOString();
-      } catch (dateErr) {
-        console.warn(`[Process] Invalid date from Gmail: ${message.date}. Using current time.`);
-        emailReceivedAt = new Date().toISOString();
-      }
+        const message = await getMessage(accessToken, selected.messageId);
+        const appData = appDataList.get(selected.application_id) || { status: "applied", contact_person: null };
 
-      let emailId: number;
+        const parsed = await parseEmailBody(
+          message.subject,
+          message.from,
+          message.body,
+          {
+            company_name: selected.company_name,
+            job_title: selected.job_title,
+            status: appData.status,
+            contact_person: appData.contact_person as string | null,
+          },
+        );
 
-      // Check if email already exists
-      const { data: existingEmail } = await admin
-        .from("emails")
-        .select("id")
-        .eq("provider", "gmail")
-        .eq("provider_message_id", message.messageId)
-        .single();
+        console.log(`[Process] Parsed output for msg ${selected.messageId}:`, parsed);
 
-      if (existingEmail) {
-        emailId = existingEmail.id;
-      } else {
-        const { data: emailRow, error: emailErr } = await admin
+        let emailReceivedAt;
+        try {
+          emailReceivedAt = new Date(message.date).toISOString();
+        } catch (dateErr) {
+          console.warn(`[Process] Invalid date from Gmail: ${message.date}. Using current time.`);
+          emailReceivedAt = new Date().toISOString();
+        }
+
+        let emailId: number;
+
+        // Check if email already exists
+        const { data: existingEmail } = await admin
           .from("emails")
-          .insert({
-            user_id: user.id,
-            provider: "gmail",
-            provider_message_id: message.messageId,
-            from_email: message.from,
-            subject: message.subject,
-            body: message.body.slice(0, 10000),
-            received_at: emailReceivedAt,
-          })
           .select("id")
+          .eq("provider", "gmail")
+          .eq("provider_message_id", message.messageId)
           .single();
 
-        if (emailErr || !emailRow) {
-          console.error(`[Process] Failed to insert email into DB:`, emailErr);
-          continue;
+        if (existingEmail) {
+          emailId = existingEmail.id;
+        } else {
+          const { data: emailRow, error: emailErr } = await admin
+            .from("emails")
+            .insert({
+              user_id: user.id,
+              provider: "gmail",
+              provider_message_id: message.messageId,
+              from_email: message.from,
+              subject: message.subject,
+              body: message.body.slice(0, 10000),
+              received_at: emailReceivedAt,
+            })
+            .select("id")
+            .single();
+
+          if (emailErr || !emailRow) {
+            console.error(`[Process] Failed to insert email into DB:`, emailErr);
+            return;
+          }
+          emailId = emailRow.id;
         }
-        emailId = emailRow.id;
+
+        const confidenceNum = parseConfidenceNum(parsed.confidence);
+
+        await admin.from("application_email_links").insert({
+          application_id: selected.application_id,
+          email_id: emailId,
+          source: "ai",
+          confidence: confidenceNum,
+          is_active: true,
+        });
+
+        const fieldEvents = buildFieldEvents(
+          selected.application_id,
+          emailId,
+          parsed,
+          emailReceivedAt,
+        );
+
+        if (fieldEvents.length > 0) {
+          await admin.from("application_field_events").insert(fieldEvents);
+        }
+
+        processedAppIds.add(selected.application_id);
+
+        updates.push({
+          application_id: selected.application_id,
+          email_subject: message.subject,
+          fields_updated: fieldEvents.map((e) => e.field_name as string),
+          confidence: parsed.confidence,
+        });
+
+      } catch (err) {
+        console.error(`Error processing email ${selected.messageId}:`, err);
       }
-
-      const confidenceNum = parseConfidenceNum(parsed.confidence);
-
-      await admin.from("application_email_links").insert({
-        application_id: selected.application_id,
-        email_id: emailId,
-        source: "ai",
-        confidence: confidenceNum,
-        is_active: true,
-      });
-
-      const fieldEvents = buildFieldEvents(
-        selected.application_id,
-        emailId,
-        parsed,
-        emailReceivedAt,
-      );
-
-      if (fieldEvents.length > 0) {
-        await admin.from("application_field_events").insert(fieldEvents);
-      }
-
-      processedAppIds.add(selected.application_id);
-
-      updates.push({
-        application_id: selected.application_id,
-        email_subject: message.subject,
-        fields_updated: fieldEvents.map((e) => e.field_name as string),
-        confidence: parsed.confidence,
-      });
-
-    } catch (err) {
-      console.error(`Error processing email ${selected.messageId}:`, err);
-    }
+    }));
   }
 
   // Bulk Recalculation Phase

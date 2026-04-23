@@ -130,43 +130,56 @@ export async function POST(request: NextRequest) {
   }
   const newEmails = Array.from(uniqueNewEmailsMap.values());
 
-  const BATCH_SIZE = 10;
-  for (let i = 0; i < newEmails.length; i += BATCH_SIZE) {
-    const batch = newEmails.slice(i, i + BATCH_SIZE);
+  const BATCH_SIZE = 25;
+  const CONCURRENCY_LIMIT = 4; // 4 should be safe with expanded quotas
+  const batches = [];
 
-    // Stage 1: Relevance Check (Batch)
-    const relevanceResults = await checkRelevanceBatch(
-      batch.map(m => ({ messageId: m.messageId, subject: m.subject, sender: m.from })),
-      applications.map((a) => ({
-        application_id: a.application_id,
-        company_name: a.company_name,
-        job_title: a.job_title,
-      }))
+  for (let i = 0; i < newEmails.length; i += BATCH_SIZE) {
+    batches.push(newEmails.slice(i, i + BATCH_SIZE));
+  }
+
+  for (let i = 0; i < batches.length; i += CONCURRENCY_LIMIT) {
+    const chunk = batches.slice(i, i + CONCURRENCY_LIMIT);
+
+    const chunkResults = await Promise.all(
+      chunk.map(async (batch) => {
+        const relevanceResults = await checkRelevanceBatch(
+          batch.map(m => ({ messageId: m.messageId, subject: m.subject, sender: m.from })),
+          applications.map((a) => ({
+            application_id: a.application_id,
+            company_name: a.company_name,
+            job_title: a.job_title,
+          }))
+        );
+        return { batch, relevanceResults };
+      })
     );
 
-    for (const relevance of relevanceResults) {
-      if (!relevance.relevant) continue;
+    for (const { batch, relevanceResults } of chunkResults) {
+      for (const relevance of relevanceResults) {
+        if (!relevance.relevant) continue;
 
-      const message = batch.find(m => m.messageId === relevance.messageId);
-      if (!message) continue;
+        const message = batch.find(m => m.messageId === relevance.messageId);
+        if (!message) continue;
 
-      const matchedApp = relevance.matched_application_id
-        ? applications.find((a) => a.application_id === relevance.matched_application_id)
-        : null;
+        const matchedApp = relevance.matched_application_id
+          ? applications.find((a) => a.application_id === relevance.matched_application_id)
+          : null;
 
-      if (!matchedApp) continue;
+        if (!matchedApp) continue;
 
-      relevantEmails.push({
-        messageId: message.messageId,
-        subject: message.subject,
-        sender: message.from,
-        application_id: matchedApp.application_id,
-        company_name: matchedApp.company_name,
-        job_title: matchedApp.job_title,
-        confidence: relevance.confidence,
-        reason: relevance.reason,
-        body: message.body,
-      });
+        relevantEmails.push({
+          messageId: message.messageId,
+          subject: message.subject,
+          sender: message.from,
+          application_id: matchedApp.application_id,
+          company_name: matchedApp.company_name,
+          job_title: matchedApp.job_title,
+          confidence: relevance.confidence,
+          reason: relevance.reason,
+          body: message.body,
+        });
+      }
     }
   }
 

@@ -21,6 +21,24 @@ const HEADER_MODELS = [
 
 let currentBodyModelIdx = 0;
 let currentHeaderModelIdx = 0;
+let currentKeyIdx = 0;
+
+// rotates through all available GROQ_API_KEY* env variables.
+function getNextApiKey(): string {
+  const keys = Object.keys(process.env)
+    .filter((k) => k.startsWith("GROQ_API_KEY"))
+    .sort()
+    .map((k) => process.env[k])
+    .filter(Boolean) as string[];
+
+  if (keys.length === 0) {
+    throw new Error("Missing GROQ_API_KEY environment variable(s)");
+  }
+
+  const key = keys[currentKeyIdx % keys.length];
+  currentKeyIdx++;
+  return key;
+}
 
 interface GroqMessage {
   role: "system" | "user" | "assistant";
@@ -28,8 +46,7 @@ interface GroqMessage {
 }
 
 async function callGroq(messages: GroqMessage[], model: string): Promise<string> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error("Missing GROQ_API_KEY environment variable");
+  const apiKey = getNextApiKey();
 
   const res = await fetch(GROQ_API_URL, {
     method: "POST",
@@ -55,32 +72,48 @@ async function callGroq(messages: GroqMessage[], model: string): Promise<string>
   return data.choices?.[0]?.message?.content ?? "{}";
 }
 
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
 async function callGroqWithRetry(messages: GroqMessage[], type: "body" | "header"): Promise<string> {
   const models = type === "body" ? BODY_MODELS : HEADER_MODELS;
   let currentIdx = type === "body" ? currentBodyModelIdx : currentHeaderModelIdx;
 
-  for (let attempt = 0; attempt < models.length; attempt++) {
-    const model = models[currentIdx];
-    try {
-      return await callGroq(messages, model);
-    } catch (err: any) {
-      if (
-        err.message.includes("429") ||
-        err.message.includes("rate limit") ||
-        err.message.includes("400") ||
-        err.message.includes("404")
-      ) {
-        console.warn(`[LLM Parser] Option ${model} failed (${err.message}), falling back to next...`);
-        currentIdx = (currentIdx + 1) % models.length;
-        if (type === "body") currentBodyModelIdx = currentIdx;
-        else currentHeaderModelIdx = currentIdx;
-        continue;
+  const MAX_CYCLES = 10;
+
+  for (let cycle = 0; cycle < MAX_CYCLES; cycle++) {
+    let allModelsRateLimited = true;
+
+    for (let attempt = 0; attempt < models.length; attempt++) {
+      const model = models[currentIdx];
+      try {
+        return await callGroq(messages, model);
+      } catch (err: any) {
+        const isRateLimit = err.message.includes("429") || err.message.includes("rate limit");
+        const isSkippable = err.message.includes("400") || err.message.includes("404");
+
+        if (isRateLimit || isSkippable) {
+          if (!isRateLimit) allModelsRateLimited = false;
+
+          console.warn(`[LLM Parser] Option ${model} failed (${err.message}), falling back to next...`);
+          currentIdx = (currentIdx + 1) % models.length;
+
+          if (type === "body") currentBodyModelIdx = currentIdx;
+          else currentHeaderModelIdx = currentIdx;
+          continue;
+        }
+        throw err;
       }
-      throw err;
+    }
+
+    if (allModelsRateLimited) {
+      console.warn(`[LLM Parser] All ${type} models rate limited. Cycle ${cycle + 1}/${MAX_CYCLES} complete. Waiting 2s...`);
+      await sleep(2000);
+    } else {
+      break;
     }
   }
 
-  throw new Error(`All ${type} Groq models exhausted or unavailable.`);
+  throw new Error(`All ${type} Groq models exhausted or unavailable after ${MAX_CYCLES} retry cycles.`);
 }
 
 function extractJson(raw: string): any {
