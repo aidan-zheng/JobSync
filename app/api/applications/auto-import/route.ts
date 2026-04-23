@@ -43,7 +43,7 @@ const MANUAL_DEFAULTS = {
   notes: null as string | null,
 };
 
-const USER_AGENT = "JobSync/auto-import (contact: dev@example.com)";
+const USER_AGENT = "Pipply/auto-import (contact: dev@example.com)";
 const MAX_HTML_CHARS = 300_000;
 const MAX_TEXT_CHARS = 12_000;
 const CHECKER_TIMEOUT_MS = 4_000;
