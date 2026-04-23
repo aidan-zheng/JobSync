@@ -460,6 +460,10 @@ export default function DashboardPage() {
     window.location.assign("/login");
   }
 
+  function handleRefreshPage() {
+    window.location.reload();
+  }
+
   const displayName =
     user?.user_metadata?.full_name ??
     user?.user_metadata?.name ??
@@ -865,10 +869,16 @@ export default function DashboardPage() {
         >
           <header className={styles.header}>
             <div className={styles.brandArea}>
-              <div className={styles.brand}>
+              <button
+                type="button"
+                className={styles.brand}
+                onClick={handleRefreshPage}
+                aria-label="Refresh dashboard"
+                title="Refresh dashboard"
+              >
                 <Briefcase className={styles.brandIcon} size={22} aria-hidden />
                 <span className={styles.appName}>Pipply</span>
-              </div>
+              </button>
               <span className={styles.headerSep}>|</span>
               <span className={styles.headerSubtitle}>Dashboard</span>
             </div>

@@ -57,6 +57,23 @@
   align-items: center;
   gap: 0.45rem;
   flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.25rem 0.35rem;
+  margin: -0.25rem -0.35rem;
+  font: inherit;
+}
+
+.brand:hover .appName {
+  color: var(--jobsync-brand);
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--jobsync-brand);
+  outline-offset: 3px;
 }
 
 .brandIcon {
