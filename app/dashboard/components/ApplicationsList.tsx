@@ -32,8 +32,11 @@ interface ApplicationsListProps {
   onLocationFilterChange: (l: LocationType | "all") => void;
   selectMode: boolean;
   selectedIds: Set<number>;
+  allSelected: boolean;
   onToggleSelectMode: () => void;
-  onToggleSelected: (appId: number) => void;
+  onSelectAll: () => void;
+  onClearSelected: () => void;
+  onToggleSelected: (appId: number, shiftKey?: boolean) => void;
   onDeleteSelected: () => void;
 }
 
@@ -84,11 +87,18 @@ export default function ApplicationsList({
   onLocationFilterChange,
   selectMode,
   selectedIds,
+  allSelected,
   onToggleSelectMode,
+  onSelectAll,
+  onClearSelected,
   onToggleSelected,
   onDeleteSelected,
 }: ApplicationsListProps) {
   const selectedCount = selectedIds.size;
+  const bulkSelectLabel = selectedCount > 0 ? "Unselect All" : "Select All";
+  const bulkSelectAction = selectedCount > 0 ? onClearSelected : onSelectAll;
+  const bulkSelectDisabled =
+    applications.length === 0 || (selectedCount === 0 && allSelected);
 
   return (
     <div className={styles.applicationsPanel}>
@@ -190,6 +200,14 @@ export default function ApplicationsList({
               <button
                 type="button"
                 className={styles.emailSelectModeBtn}
+                onClick={bulkSelectAction}
+                disabled={bulkSelectDisabled}
+              >
+                {bulkSelectLabel}
+              </button>
+              <button
+                type="button"
+                className={styles.emailSelectModeBtn}
                 onClick={onToggleSelectMode}
               >
                 Done
@@ -214,7 +232,7 @@ export default function ApplicationsList({
                   type="button"
                   className={`${styles.appCard} ${selectedIds.has(app.id) || selectedApp?.id === app.id ? styles.appCardActive : ""}`}
                   aria-pressed={selectedIds.has(app.id)}
-                  onClick={() => onToggleSelected(app.id)}
+                  onClick={(event) => onToggleSelected(app.id, event.shiftKey)}
                 >
                   <div className={styles.appCardMain}>
                     <span

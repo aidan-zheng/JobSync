@@ -75,6 +75,7 @@ export default function DashboardPage() {
     useState(false);
   const [bulkDeletingApplications, setBulkDeletingApplications] = useState(false);
   const authUserIdRef = useRef<string | null>(null);
+  const lastSelectedApplicationIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -97,6 +98,7 @@ export default function DashboardPage() {
       setShowDeleteEmailsModal(false);
       setAppsSelectMode(false);
       setSelectedApplicationIds(new Set());
+      lastSelectedApplicationIdRef.current = null;
       setApplicationsToDelete([]);
       setShowBulkDeleteApplicationsModal(false);
       setBulkDeletingApplications(false);
@@ -447,6 +449,9 @@ export default function DashboardPage() {
       locationFilter === "all" || app.location_type === locationFilter;
     return matchesSearch && matchesStatus && matchesLocation;
   });
+  const allFilteredAppsSelected =
+    filteredApps.length > 0 &&
+    filteredApps.every((app) => selectedApplicationIds.has(app.id));
 
   function handleApplicationCreated(app: Application) {
     setApplications((prev) => [app, ...prev]);
@@ -590,16 +595,61 @@ export default function DashboardPage() {
     if (bulkDeletingApplications) return;
     setAppsSelectMode((prev) => !prev);
     setSelectedApplicationIds(new Set());
+    lastSelectedApplicationIdRef.current = null;
   }
 
-  function handleToggleApplicationSelected(appId: number) {
+  function handleToggleApplicationSelected(appId: number, shiftKey = false) {
     if (bulkDeletingApplications) return;
+
+    const anchorId = lastSelectedApplicationIdRef.current;
+    const hasRangeAnchor = shiftKey && anchorId != null && anchorId !== appId;
+    const rangeIds = hasRangeAnchor
+      ? (() => {
+          const startIndex = filteredApps.findIndex((app) => app.id === anchorId);
+          const endIndex = filteredApps.findIndex((app) => app.id === appId);
+          if (startIndex === -1 || endIndex === -1) return [];
+          const [from, to] =
+            startIndex < endIndex
+              ? [startIndex, endIndex]
+              : [endIndex, startIndex];
+          return filteredApps.slice(from, to + 1).map((app) => app.id);
+        })()
+      : [];
+
     setSelectedApplicationIds((prev) => {
       const next = new Set(prev);
-      if (next.has(appId)) next.delete(appId);
-      else next.add(appId);
+
+      if (rangeIds.length > 0) {
+        const shouldSelectRange = !next.has(appId);
+        rangeIds.forEach((id) => {
+          if (shouldSelectRange) next.add(id);
+          else next.delete(id);
+        });
+      } else if (next.has(appId)) {
+        next.delete(appId);
+      } else {
+        next.add(appId);
+      }
+
       return next;
     });
+
+    lastSelectedApplicationIdRef.current = appId;
+  }
+
+  function handleSelectAllApplications() {
+    if (bulkDeletingApplications) return;
+    if (filteredApps.length === 0) return;
+
+    setSelectedApplicationIds(new Set(filteredApps.map((app) => app.id)));
+    lastSelectedApplicationIdRef.current =
+      filteredApps[filteredApps.length - 1]?.id ?? null;
+  }
+
+  function handleClearSelectedApplications() {
+    if (bulkDeletingApplications) return;
+    setSelectedApplicationIds(new Set());
+    lastSelectedApplicationIdRef.current = null;
   }
 
   function handleRequestBulkDeleteApplications() {
@@ -881,7 +931,10 @@ export default function DashboardPage() {
                   onLocationFilterChange={setLocationFilter}
                   selectMode={appsSelectMode}
                   selectedIds={selectedApplicationIds}
+                  allSelected={allFilteredAppsSelected}
                   onToggleSelectMode={handleToggleApplicationsSelectMode}
+                  onSelectAll={handleSelectAllApplications}
+                  onClearSelected={handleClearSelectedApplications}
                   onToggleSelected={handleToggleApplicationSelected}
                   onDeleteSelected={handleRequestBulkDeleteApplications}
                 />
