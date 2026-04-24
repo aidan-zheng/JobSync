@@ -1,16 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Search, Plus, Check, Trash2 } from "lucide-react";
+import { Search, Plus, Check, Trash2, ChevronDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDateOnly } from "@/lib/date-only";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type {
   Application,
   ApplicationStatus,
@@ -89,6 +82,10 @@ export default function ApplicationsList({
   onDeleteSelected,
 }: ApplicationsListProps) {
   const selectedCount = selectedIds.size;
+  const selectedStatusLabel =
+    statusFilter === "all" ? "All" : STATUS_LABELS[statusFilter];
+  const selectedLocationLabel =
+    locationFilter === "all" ? "All" : LOCATION_LABELS[locationFilter];
 
   return (
     <div className={styles.applicationsPanel}>
@@ -112,53 +109,49 @@ export default function ApplicationsList({
       </div>
 
       <div className={styles.filtersRow}>
-        <Select
-          value={statusFilter}
-          onValueChange={(value) =>
-            onStatusFilterChange(value as ApplicationStatus | "all")
-          }
-        >
-          <SelectTrigger
-            size="sm"
+        <label className={styles.filterSelectLabel}>
+          <span>Status:</span>
+          <span className={styles.filterSelectValue}>{selectedStatusLabel}</span>
+          <select
             aria-label="Filter by status"
-            className="h-auto justify-start gap-1.5 border-[var(--jobsync-border-strong)] text-[var(--jobsync-text-muted)] bg-transparent px-2.5 py-1.5 text-xs font-medium shadow-none hover:border-[var(--jobsync-brand)] hover:bg-[rgba(0,0,0,0.03)] focus-visible:ring-0"
+            className={styles.filterSelect}
+            value={statusFilter}
+            onChange={(e) =>
+              onStatusFilterChange(e.target.value as ApplicationStatus | "all")
+            }
           >
-            <span>Status:</span>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="start">
-            <SelectItem value="all">All</SelectItem>
+            <option value="all">All</option>
             {STATUS_FILTER_ITEMS.map((status) => (
-              <SelectItem key={status} value={status}>
+              <option key={status} value={status}>
                 {STATUS_LABELS[status]}
-              </SelectItem>
+              </option>
             ))}
-          </SelectContent>
-        </Select>
+          </select>
+          <ChevronDown size={14} className={styles.filterSelectIcon} />
+        </label>
 
-        <Select
-          value={locationFilter}
-          onValueChange={(value) =>
-            onLocationFilterChange(value as LocationType | "all")
-          }
-        >
-          <SelectTrigger
-            size="sm"
+        <label className={styles.filterSelectLabel}>
+          <span>Location:</span>
+          <span className={styles.filterSelectValue}>
+            {selectedLocationLabel}
+          </span>
+          <select
             aria-label="Filter by location"
-            className="h-auto justify-start gap-1.5 border-[var(--jobsync-border-strong)] text-[var(--jobsync-text-muted)] bg-transparent px-2.5 py-1.5 text-xs font-medium shadow-none hover:border-[var(--jobsync-brand)] hover:bg-[rgba(0,0,0,0.03)] focus-visible:ring-0"
+            className={styles.filterSelect}
+            value={locationFilter}
+            onChange={(e) =>
+              onLocationFilterChange(e.target.value as LocationType | "all")
+            }
           >
-            <span>Location:</span>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="start">
-            <SelectItem value="all">All</SelectItem>
+            <option value="all">All</option>
             {LOCATION_FILTER_ITEMS.map((location) => (
-              <SelectItem key={location} value={location}>
+              <option key={location} value={location}>
                 {LOCATION_LABELS[location]}
-              </SelectItem>
+              </option>
             ))}
-          </SelectContent>
-        </Select>
+          </select>
+          <ChevronDown size={14} className={styles.filterSelectIcon} />
+        </label>
       </div>
 
       <div className={styles.listSubheader}>

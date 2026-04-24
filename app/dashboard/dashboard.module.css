@@ -57,6 +57,23 @@
   align-items: center;
   gap: 0.45rem;
   flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.25rem 0.35rem;
+  margin: -0.25rem -0.35rem;
+  font: inherit;
+}
+
+.brand:hover .appName {
+  color: var(--jobsync-brand);
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--jobsync-brand);
+  outline-offset: 3px;
 }
 
 .brandIcon {
@@ -283,6 +300,60 @@
 .filterButton:hover {
   border-color: var(--jobsync-brand);
   background: rgba(0, 0, 0, 0.03);
+}
+
+.filterSelectLabel {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.3rem 1.8rem 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--jobsync-text-muted);
+  background: transparent;
+  border: 1px solid var(--jobsync-border-strong);
+  border-radius: 6px;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.filterSelectLabel:hover {
+  border-color: var(--jobsync-brand);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.filterSelectLabel:focus-within {
+  border-color: var(--jobsync-brand);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
+
+.filterSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  appearance: none;
+  cursor: pointer;
+}
+
+.filterSelectValue {
+  color: var(--jobsync-text);
+}
+
+.filterSelectIcon {
+  position: absolute;
+  right: 0.5rem;
+  color: var(--jobsync-text-muted);
+  pointer-events: none;
 }
 
 .listSubheader {
