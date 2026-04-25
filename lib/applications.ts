@@ -163,25 +163,27 @@ export function buildFieldEvents(
       confidence,
     });
   }
-  if (parsed.salary_per_hour != null) {
+  if (parsed.compensation_amount != null) {
     events.push({
       application_id: applicationId,
       source_type: "email",
       email_id: emailId,
       field_name: "compensation_amount",
-      value_number: parsed.salary_per_hour,
+      value_number: parsed.compensation_amount,
       event_time: eventTime,
       confidence,
     });
-    events.push({
-      application_id: applicationId,
-      source_type: "email",
-      email_id: emailId,
-      field_name: "salary_type",
-      value_text: "hourly",
-      event_time: eventTime,
-      confidence,
-    });
+    if (parsed.salary_type != null) {
+      events.push({
+        application_id: applicationId,
+        source_type: "email",
+        email_id: emailId,
+        field_name: "salary_type",
+        value_text: parsed.salary_type,
+        event_time: eventTime,
+        confidence,
+      });
+    }
   }
   if (parsed.location_type) {
     events.push({

@@ -48,6 +48,8 @@ import {
 import styles from "./dashboard.module.css";
 
 const FIELD_LABELS: Record<string, string> = {
+  compensation_amount: "Compensation",
+  salary_type: "Salary type",
   salary_per_hour: "Salary / hour",
   salary_yearly: "Salary (yearly)",
   location_type: "Location type",

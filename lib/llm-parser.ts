@@ -208,7 +208,8 @@ ${emailList}`;
 
 export interface ParsedEmailUpdate {
   status: string | null;
-  salary_per_hour: number | null;
+  compensation_amount: number | null;
+  salary_type: string | null;
   location_type: string | null;
   location: string | null;
   contact_person: string | null;
@@ -240,7 +241,8 @@ Given an email about a job application, extract any field updates.
 
 Return ONLY a JSON object with these fields (set to null if not mentioned/changed):
 - "status": one of "draft", "applied", "interviewing", "offer", "rejected", "withdrawn", "ghosted" — or null if no status change detected
-- "salary_per_hour": number or null — hourly rate if mentioned
+- "compensation_amount": number or null — the compensation value if mentioned
+- "salary_type": one of "hourly", "weekly", "biweekly", "monthly", "yearly" — or null if no compensation is mentioned
 - "location_type": one of "remote", "hybrid", "on_site" — or null
 - "location": string or null — city/office location if mentioned
 - "contact_person": string or null — recruiter or hiring manager name. ONLY extract this if a person explicitly introduces themselves or signs off in the email body. DO NOT guess it from the sender email address.
@@ -282,7 +284,8 @@ ${truncatedBody}`;
 
     return {
       status: parsed.status ? parsed.status.toLowerCase() : null,
-      salary_per_hour: parsed.salary_per_hour != null ? Number(parsed.salary_per_hour) : null,
+      compensation_amount: parsed.compensation_amount != null ? Number(parsed.compensation_amount) : null,
+      salary_type: parsed.salary_type ? parsed.salary_type.toLowerCase() : null,
       location_type: parsed.location_type ? parsed.location_type.toLowerCase() : null,
       location: parsed.location ?? null,
       contact_person: contact_person,
@@ -293,7 +296,8 @@ ${truncatedBody}`;
     console.error(`[Stage 2] Failed to parse LLM JSON:`, err, "\nRaw output:", raw);
     return {
       status: null,
-      salary_per_hour: null,
+      compensation_amount: null,
+      salary_type: null,
       location_type: null,
       location: null,
       contact_person: null,
