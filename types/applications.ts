@@ -8,6 +8,12 @@ export type ApplicationStatus =
   | "ghosted";
 
 export type LocationType = "remote" | "hybrid" | "on_site";
+export type SalaryType =
+  | "hourly"
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "yearly";
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -29,7 +35,8 @@ export interface Application {
   updated_at: string;
   company_name: string;
   job_title: string;
-  salary_per_hour: number | null;
+  compensation_amount: number | null;
+  salary_type: SalaryType | null;
   notes: string | null;
   location_type: LocationType | null;
   location: string | null;
@@ -64,6 +71,8 @@ export interface FullEmail {
 export type SourceType = "scrape" | "email" | "manual";
 
 export type ApplicationFieldName =
+  | "compensation_amount"
+  | "salary_type"
   | "salary_per_hour"
   | "salary_yearly"
   | "location_type"
@@ -131,4 +140,12 @@ export const LOCATION_LABELS: Record<LocationType, string> = {
   remote: "Remote",
   hybrid: "Hybrid",
   on_site: "On-Site",
+};
+
+export const SALARY_TYPE_LABELS: Record<SalaryType, string> = {
+  hourly: "Hourly",
+  weekly: "Weekly",
+  biweekly: "Biweekly",
+  monthly: "Monthly",
+  yearly: "Yearly",
 };

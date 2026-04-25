@@ -25,10 +25,10 @@ export function isNonNegativeNumber(value: number | null): boolean {
 }
 
 export const INVALID_SALARY_INPUT_ERROR =
-  "Invalid salary input. Enter a valid number or leave the field empty.";
+  "Invalid compensation input. Enter a valid number or leave the field empty.";
 
 export const NON_NEGATIVE_SALARY_ERROR =
-  "Salary / hour must be zero or greater.";
+  "Compensation must be zero or greater.";
 
 export function getSalaryValidationError(
   value: number | null | undefined,

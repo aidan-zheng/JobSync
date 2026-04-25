@@ -5,6 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, Mail, Loader2, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  formatCompensation,
+  getCompensationFieldLabel,
+  getCompensationPlaceholder,
+  isSalaryType,
+  SALARY_TYPES,
+} from "@/lib/compensation";
+import {
   APPLICATION_TEXT_LIMITS,
   getLimitedTextValue,
 } from "@/lib/application-field-limits";
@@ -19,10 +26,12 @@ import type {
   ApplicationFieldName,
   ApplicationStatus,
   LocationType,
+  SalaryType,
 } from "@/types/applications";
 import {
   STATUS_LABELS,
   LOCATION_LABELS,
+  SALARY_TYPE_LABELS,
 } from "@/types/applications";
 import styles from "../dashboard.module.css";
 
@@ -170,7 +179,7 @@ export default function ApplicationDetails({
     if (!application || saving) return;
 
     const rawValue =
-      field_name === "salary_per_hour" || field_name === "salary_yearly"
+      field_name === "compensation_amount"
         ? parseOptionalNumber(editValue === "N/A" ? "" : editValue)
         : field_name === "date_applied"
           ? editValue || null
@@ -179,16 +188,25 @@ export default function ApplicationDetails({
             : editValue;
 
     if (
-      (field_name === "salary_per_hour" || field_name === "salary_yearly") &&
+      field_name === "compensation_amount" &&
       getSalaryValidationError(rawValue as number | null | undefined)
     ) {
       alert(getSalaryValidationError(rawValue as number | null | undefined));
       return;
     }
 
+    if (
+      field_name === "salary_type" &&
+      rawValue != null &&
+      !isSalaryType(rawValue)
+    ) {
+      alert("Salary type must be hourly, weekly, biweekly, monthly, or yearly.");
+      return;
+    }
+
     let currentValue: string | number | null = null;
-    if (field_name === "salary_per_hour") currentValue = application.salary_per_hour ?? null;
-    else if (field_name === "salary_yearly") currentValue = application.salary_per_hour ?? null;
+    if (field_name === "compensation_amount") currentValue = application.compensation_amount ?? null;
+    else if (field_name === "salary_type") currentValue = application.salary_type ?? null;
     else if (field_name === "location_type") currentValue = application.location_type ?? null;
     else if (field_name === "location") currentValue = application.location ?? null;
     else if (field_name === "contact_person") currentValue = application.contact_person ?? null;
@@ -209,8 +227,8 @@ export default function ApplicationDetails({
     setSaving(true);
 
     const merged: Application = { ...application };
-    if (field_name === "salary_per_hour") merged.salary_per_hour = rawValue as number | null;
-    else if (field_name === "salary_yearly") merged.salary_per_hour = rawValue as number | null;
+    if (field_name === "compensation_amount") merged.compensation_amount = rawValue as number | null;
+    else if (field_name === "salary_type") merged.salary_type = rawValue as SalaryType | null;
     else if (field_name === "location_type") merged.location_type = rawValue as LocationType | null;
     else if (field_name === "location") merged.location = rawValue as string | null;
     else if (field_name === "contact_person") merged.contact_person = rawValue as string | null;
@@ -256,44 +274,47 @@ export default function ApplicationDetails({
     isEmpty?: boolean;
     isStatus?: boolean;
   }[] = [
-      {
-        label: "Hourly Salary (0+)",
-        value: app.salary_per_hour != null ? `$${app.salary_per_hour}` : "N/A",
-        fieldName: "salary_per_hour",
-      },
-      {
-        label: "Location Type",
-        value: app.location_type ? LOCATION_LABELS[app.location_type] : "N/A",
-        fieldName: "location_type",
-        label2: "Location",
-        value2: app.location || "N/A",
-        fieldName2: "location",
-      },
-      {
-        label: "Contact Person",
-        value: app.contact_person || "N/A",
-        fieldName: "contact_person",
-        label2: "Date Applied",
-        value2: formatDateOnly(app.date_applied, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-        fieldName2: "date_applied",
-      },
-      {
-        label: "Status",
-        value: STATUS_LABELS[app.status],
-        fieldName: "status",
-        isStatus: true,
-      },
-      {
-        label: "Notes",
-        value: app.notes || "",
-        isEmpty: !app.notes,
-        fieldName: "notes",
-      },
-    ];
+    {
+      label: getCompensationFieldLabel(app.salary_type),
+      value: formatCompensation(app.compensation_amount, app.salary_type),
+      fieldName: "compensation_amount",
+      label2: "Salary Type",
+      value2: app.salary_type ? SALARY_TYPE_LABELS[app.salary_type] : "N/A",
+      fieldName2: "salary_type",
+    },
+    {
+      label: "Location Type",
+      value: app.location_type ? LOCATION_LABELS[app.location_type] : "N/A",
+      fieldName: "location_type",
+      label2: "Location",
+      value2: app.location || "N/A",
+      fieldName2: "location",
+    },
+    {
+      label: "Contact Person",
+      value: app.contact_person || "N/A",
+      fieldName: "contact_person",
+      label2: "Date Applied",
+      value2: formatDateOnly(app.date_applied, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+      fieldName2: "date_applied",
+    },
+    {
+      label: "Status",
+      value: STATUS_LABELS[app.status],
+      fieldName: "status",
+      isStatus: true,
+    },
+    {
+      label: "Notes",
+      value: app.notes || "",
+      isEmpty: !app.notes,
+      fieldName: "notes",
+    },
+  ];
 
   const sortedEmails = [...emails].sort((a, b) => (a.linked === b.linked ? 0 : a.linked ? -1 : 1));
 
@@ -392,7 +413,7 @@ export default function ApplicationDetails({
       return <AnimatedValue value={displayValue} className={styles.fieldValue} isLoading={isLoading} />;
     }
 
-    if (fieldName === "location_type") {
+    if (fieldName === "location_type" || fieldName === "salary_type") {
       if (isEditing) {
         return (
           <div className={styles.fieldEditWrap}>
@@ -403,13 +424,19 @@ export default function ApplicationDetails({
               autoFocus
             >
               <option value="">N/A</option>
-              {(Object.entries(LOCATION_LABELS) as [LocationType, string][]).map(
-                ([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ),
-              )}
+              {fieldName === "location_type"
+                ? (Object.entries(LOCATION_LABELS) as [LocationType, string][]).map(
+                    ([k, v]) => (
+                      <option key={k} value={k}>
+                        {v}
+                      </option>
+                    ),
+                  )
+                : SALARY_TYPES.map((salaryType) => (
+                    <option key={salaryType} value={salaryType}>
+                      {SALARY_TYPE_LABELS[salaryType]}
+                    </option>
+                  ))}
             </select>
             <button
               type="button"
@@ -422,7 +449,9 @@ export default function ApplicationDetails({
             <button
               type="button"
               className={styles.fieldSaveBtn}
-              onClick={() => handleSave("location_type")}
+              onClick={() =>
+                handleSave(fieldName === "salary_type" ? "salary_type" : "location_type")
+              }
               disabled={saving}
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : "Save"}
@@ -471,7 +500,7 @@ export default function ApplicationDetails({
 
     if (isEditing) {
       const isNum =
-        fieldName === "salary_per_hour" || fieldName === "salary_yearly";
+        fieldName === "compensation_amount";
       const limit = getEditLimit(fieldName);
       const limitedField =
         fieldName === "location"
@@ -496,7 +525,9 @@ export default function ApplicationDetails({
                   ),
               )
             }
-            placeholder={isNum ? "e.g. 45" : ""}
+            placeholder={
+              isNum ? getCompensationPlaceholder(app.salary_type) : ""
+            }
             autoFocus
             inputMode={isNum ? "decimal" : undefined}
             maxLength={limit ?? undefined}
@@ -541,7 +572,7 @@ export default function ApplicationDetails({
     raw?: string | number | null,
   ) {
     setEditingField(fieldName);
-    if (fieldName === "salary_per_hour" || fieldName === "salary_yearly") {
+    if (fieldName === "compensation_amount") {
       setEditValue(raw != null && raw !== "" ? String(raw) : "");
     } else if (fieldName === "date_applied" && app.date_applied) {
       setEditValue(app.date_applied.slice(0, 10));
@@ -549,6 +580,8 @@ export default function ApplicationDetails({
       setEditValue(app.status);
     } else if (fieldName === "location_type") {
       setEditValue(app.location_type ?? "");
+    } else if (fieldName === "salary_type") {
+      setEditValue(app.salary_type ?? "");
     } else {
       setEditValue(currentValue === "N/A" ? "" : currentValue);
     }
@@ -633,8 +666,8 @@ export default function ApplicationDetails({
                           startEdit(
                             field.fieldName!,
                             field.value,
-                            field.fieldName === "salary_per_hour"
-                              ? app.salary_per_hour
+                            field.fieldName === "compensation_amount"
+                              ? app.compensation_amount
                               : undefined,
                           )
                         }

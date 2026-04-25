@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/supabase/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { ApplicationStatus, LocationType } from "@/types/applications";
+import type {
+  ApplicationStatus,
+  LocationType,
+  SalaryType,
+} from "@/types/applications";
 
 type AutoImportBody = {
   job_url?: string | null;
@@ -35,7 +39,8 @@ type BrokenLinkCheckerModule = {
 const MANUAL_DEFAULTS = {
   company_name: "Company",
   job_title: "Job Title",
-  salary_per_hour: null as number | null,
+  compensation_amount: null as number | null,
+  salary_type: null as SalaryType | null,
   location_type: null as LocationType | null,
   location: null as string | null,
   contact_person: null as string | null,
@@ -318,7 +323,8 @@ export async function POST(request: NextRequest) {
       typeof extracted.job_title === "string" && extracted.job_title.trim()
         ? extracted.job_title.trim()
         : MANUAL_DEFAULTS.job_title,
-    salary_per_hour: safeSalary,
+    compensation_amount: safeSalary,
+    salary_type: safeSalary != null ? "hourly" : MANUAL_DEFAULTS.salary_type,
     location_type,
     location:
       typeof extracted.location === "string" && extracted.location.trim()
@@ -385,12 +391,22 @@ export async function POST(request: NextRequest) {
     event_time: eventTime,
   });
 
-  if (row.salary_per_hour != null) {
+  if (row.compensation_amount != null) {
     initialEvents.push({
       application_id: applicationId,
-      field_name: "salary_per_hour",
+      field_name: "compensation_amount",
       source_type: sourceType,
-      value_number: row.salary_per_hour,
+      value_number: row.compensation_amount,
+      event_time: eventTime,
+    });
+  }
+
+  if (row.salary_type) {
+    initialEvents.push({
+      application_id: applicationId,
+      field_name: "salary_type",
+      source_type: sourceType,
+      value_text: row.salary_type,
       event_time: eventTime,
     });
   }

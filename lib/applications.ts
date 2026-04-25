@@ -10,8 +10,12 @@ export function extractFieldValue(
   switch (fieldName) {
     case "status":
       return event.value_status ?? null;
+    case "compensation_amount":
     case "salary_per_hour":
+    case "salary_yearly":
       return event.value_number ?? null;
+    case "salary_type":
+      return event.value_text ?? null;
     case "location_type":
       return event.value_location_type ?? null;
     case "location":
@@ -53,18 +57,47 @@ export async function recalculateApplication(
 
   for (const event of allEvents ?? []) {
     const fieldName = event.field_name as string;
-    if (seenFields.has(fieldName)) continue;
     if (event.email_id != null && excludeEmailIds.has(event.email_id)) continue;
-
-    seenFields.add(fieldName);
     const value = extractFieldValue(fieldName, event);
-    if (fieldName === "salary_yearly") continue; // deprecated or unused
+
+    if (fieldName === "compensation_amount") {
+      if (!seenFields.has("compensation_amount")) {
+        recalculated.compensation_amount = value ?? null;
+        seenFields.add("compensation_amount");
+      }
+      continue;
+    }
+
+    if (fieldName === "salary_type") {
+      if (!seenFields.has("salary_type")) {
+        recalculated.salary_type = value ?? null;
+        seenFields.add("salary_type");
+      }
+      continue;
+    }
+
+    if (fieldName === "salary_per_hour" || fieldName === "salary_yearly") {
+      if (!seenFields.has("compensation_amount")) {
+        recalculated.compensation_amount = value ?? null;
+        seenFields.add("compensation_amount");
+      }
+      if (!seenFields.has("salary_type")) {
+        recalculated.salary_type =
+          fieldName === "salary_yearly" ? "yearly" : "hourly";
+        seenFields.add("salary_type");
+      }
+      continue;
+    }
+
+    if (seenFields.has(fieldName)) continue;
+    seenFields.add(fieldName);
     recalculated[fieldName] = value;
   }
 
   const fieldsWithPossibleEvents = [
     "status",
-    "salary_per_hour",
+    "compensation_amount",
+    "salary_type",
     "location_type",
     "location",
     "contact_person",
@@ -121,8 +154,17 @@ export function buildFieldEvents(
       application_id: applicationId,
       source_type: "email",
       email_id: emailId,
-      field_name: "salary_per_hour",
+      field_name: "compensation_amount",
       value_number: parsed.salary_per_hour,
+      event_time: eventTime,
+      confidence,
+    });
+    events.push({
+      application_id: applicationId,
+      source_type: "email",
+      email_id: emailId,
+      field_name: "salary_type",
+      value_text: "hourly",
       event_time: eventTime,
       confidence,
     });

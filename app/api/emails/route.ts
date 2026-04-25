@@ -4,8 +4,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, requireAppOwner } from "@/lib/supabase/api-auth";
 import type { Confidence } from "@/types/applications";
-
 import { parseConfidenceNum, parseConfidenceString } from "@/types/applications";
+import { recalculateApplication } from "@/lib/applications";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -158,8 +158,6 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(response, { status: 201 });
 }
-
-import { recalculateApplication } from "@/lib/applications";
 
 export async function PATCH(request: NextRequest) {
   let body: { link_id: number; is_active: boolean };

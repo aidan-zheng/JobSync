@@ -3,6 +3,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/supabase/api-auth";
+import { isSalaryType } from "@/lib/compensation";
 import { getLocalDateInputValue } from "@/lib/date-only";
 import {
   APPLICATION_TEXT_LIMITS,
@@ -12,7 +13,11 @@ import {
   getSalaryValidationError,
   parseOptionalNumber,
 } from "@/lib/salary-validation";
-import type { ApplicationStatus, LocationType } from "@/types/applications";
+import type {
+  ApplicationStatus,
+  LocationType,
+  SalaryType,
+} from "@/types/applications";
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
@@ -39,7 +44,8 @@ export async function GET(request: NextRequest) {
 const MANUAL_DEFAULTS = {
   company_name: "Company",
   job_title: "Job Title",
-  salary_per_hour: null as number | null,
+  compensation_amount: null as number | null,
+  salary_type: null as SalaryType | null,
   location_type: null as LocationType | null,
   location: null as string | null,
   date_applied: getLocalDateInputValue(),
@@ -54,7 +60,8 @@ export type CreateApplicationBody =
     mode: "manual";
     company_name?: string;
     job_title?: string;
-    salary_per_hour?: number | null;
+    compensation_amount?: number | null;
+    salary_type?: SalaryType | null;
     location_type?: LocationType | null;
     location?: string | null;
     date_applied?: string;
@@ -103,10 +110,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const salaryPerHour = parseOptionalNumber(manual.salary_per_hour);
+  const compensationAmount = parseOptionalNumber(manual.compensation_amount);
   const salaryValidationError =
-    manual.salary_per_hour !== undefined
-      ? getSalaryValidationError(salaryPerHour)
+    manual.compensation_amount !== undefined
+      ? getSalaryValidationError(compensationAmount)
       : null;
   if (salaryValidationError) {
     return NextResponse.json(
@@ -115,13 +122,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (
+    manual.salary_type !== undefined &&
+    manual.salary_type !== null &&
+    !isSalaryType(manual.salary_type)
+  ) {
+    return NextResponse.json(
+      { error: "salary_type must be hourly, weekly, biweekly, monthly, or yearly" },
+      { status: 400 },
+    );
+  }
+
   const row = {
     company_name: manual.company_name?.trim() ?? MANUAL_DEFAULTS.company_name,
     job_title: manual.job_title?.trim() ?? MANUAL_DEFAULTS.job_title,
-    salary_per_hour:
-      manual.salary_per_hour !== undefined
-        ? salaryPerHour
-        : MANUAL_DEFAULTS.salary_per_hour,
+    compensation_amount:
+      manual.compensation_amount !== undefined
+        ? compensationAmount
+        : MANUAL_DEFAULTS.compensation_amount,
+    salary_type:
+      manual.salary_type !== undefined
+        ? manual.salary_type
+        : MANUAL_DEFAULTS.salary_type,
     location_type:
       manual.location_type !== undefined
         ? manual.location_type
@@ -196,12 +218,21 @@ export async function POST(request: NextRequest) {
       event_time: eventTime,
     });
   }
-  if (row.salary_per_hour != null) {
+  if (row.compensation_amount != null) {
     initialEvents.push({
       application_id: applicationId,
-      field_name: "salary_per_hour",
+      field_name: "compensation_amount",
       source_type: sourceType,
-      value_number: row.salary_per_hour,
+      value_number: row.compensation_amount,
+      event_time: eventTime,
+    });
+  }
+  if (row.salary_type) {
+    initialEvents.push({
+      application_id: applicationId,
+      field_name: "salary_type",
+      source_type: sourceType,
+      value_text: row.salary_type,
       event_time: eventTime,
     });
   }
