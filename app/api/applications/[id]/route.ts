@@ -3,6 +3,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentAppOwner } from "@/lib/supabase/api-auth";
+import { isSalaryType } from "@/lib/compensation";
 import { getLocalDateInputValue, parseDateOnly } from "@/lib/date-only";
 import {
   APPLICATION_TEXT_LIMITS,
@@ -16,6 +17,7 @@ import type {
   ApplicationStatus,
   ApplicationFieldName,
   LocationType,
+  SalaryType,
 } from "@/types/applications";
 import { recalculateApplication } from "@/lib/applications";
 
@@ -49,18 +51,49 @@ function buildUpdateAndEvent(
   };
 
   switch (field_name) {
+    case "compensation_amount": {
+      const n = value === "" || value == null ? null : Number(value);
+      return {
+        currentUpdate: { compensation_amount: n },
+        eventPayload: { ...eventPayload, value_number: n },
+      };
+    }
+    case "salary_type": {
+      const v =
+        value === "" || value == null
+          ? null
+          : (String(value) as SalaryType);
+      return {
+        currentUpdate: { salary_type: v },
+        eventPayload: { ...eventPayload, value_text: v },
+      };
+    }
     case "salary_per_hour": {
       const n = value === "" || value == null ? null : Number(value);
       return {
-        currentUpdate: { salary_per_hour: n },
-        eventPayload: { ...eventPayload, value_number: n },
+        currentUpdate: {
+          compensation_amount: n,
+          salary_type: n == null ? null : "hourly",
+        },
+        eventPayload: {
+          ...eventPayload,
+          field_name: "compensation_amount",
+          value_number: n,
+        },
       };
     }
     case "salary_yearly": {
       const n = value === "" || value == null ? null : Number(value);
       return {
-        currentUpdate: {},
-        eventPayload: { ...eventPayload, value_number: n },
+        currentUpdate: {
+          compensation_amount: n,
+          salary_type: n == null ? null : "yearly",
+        },
+        eventPayload: {
+          ...eventPayload,
+          field_name: "compensation_amount",
+          value_number: n,
+        },
       };
     }
     case "location_type": {
@@ -117,6 +150,8 @@ function buildUpdateAndEvent(
 }
 
 const ALLOWED_FIELDS: ApplicationFieldName[] = [
+  "compensation_amount",
+  "salary_type",
   "salary_per_hour",
   "salary_yearly",
   "location_type",
@@ -177,7 +212,11 @@ export async function PUT(
     }
   }
 
-  if (field_name === "salary_per_hour" || field_name === "salary_yearly") {
+  if (
+    field_name === "compensation_amount" ||
+    field_name === "salary_per_hour" ||
+    field_name === "salary_yearly"
+  ) {
     const salaryValue = parseOptionalNumber(value);
     const salaryValidationError = getSalaryValidationError(salaryValue);
     if (salaryValidationError) {
@@ -186,6 +225,18 @@ export async function PUT(
         { status: 400 },
       );
     }
+  }
+
+  if (
+    field_name === "salary_type" &&
+    value !== "" &&
+    value != null &&
+    !isSalaryType(value)
+  ) {
+    return NextResponse.json(
+      { error: "salary_type must be hourly, weekly, biweekly, monthly, or yearly" },
+      { status: 400 },
+    );
   }
 
   const auth = await requireCurrentAppOwner(request, idNum);
@@ -254,7 +305,7 @@ export async function PUT(
   const eventRow = {
     application_id: applicationId,
     email_id: null as number | null,
-    field_name: field_name,
+    field_name: (eventPayload.field_name as ApplicationFieldName | undefined) ?? field_name,
     value_text: (eventPayload.value_text as string | undefined) ?? null,
     value_number: (eventPayload.value_number as number | undefined) ?? null,
     value_date: (eventPayload.value_date as string | undefined) ?? null,

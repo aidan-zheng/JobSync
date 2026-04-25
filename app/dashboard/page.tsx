@@ -1,14 +1,19 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
 import { Briefcase, User, Mail } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 import Grainient from "@/components/Grainient/Grainient";
+import {
+  formatCompensation,
+  formatCompensationAmount,
+  isSalaryType,
+} from "@/lib/compensation";
 import ApplicationsList from "./components/ApplicationsList";
 import ApplicationDetails from "./components/ApplicationDetails";
 import EmailsTimeline from "./components/EmailsTimeline";
@@ -32,8 +37,13 @@ import type {
   TimelineEvent,
   ApplicationStatus,
   LocationType,
+  SalaryType,
 } from "@/types/applications";
-import { STATUS_LABELS, LOCATION_LABELS } from "@/types/applications";
+import {
+  STATUS_LABELS,
+  LOCATION_LABELS,
+  SALARY_TYPE_LABELS,
+} from "@/types/applications";
 
 import styles from "./dashboard.module.css";
 
@@ -107,6 +117,7 @@ export default function DashboardPage() {
   const [bulkDeletingApplications, setBulkDeletingApplications] =
     useState(false);
   const authUserIdRef = useRef<string | null>(null);
+  const lastSelectedApplicationIdRef = useRef<number | null>(null);
   const authReadyRef = useRef(false);
   const applicationsRequestIdRef = useRef(0);
 
@@ -139,6 +150,7 @@ export default function DashboardPage() {
       setShowDeleteEmailsModal(false);
       setAppsSelectMode(false);
       setSelectedApplicationIds(new Set());
+      lastSelectedApplicationIdRef.current = null;
       setApplicationsToDelete([]);
       setShowBulkDeleteApplicationsModal(false);
       setBulkDeletingApplications(false);
@@ -232,7 +244,21 @@ export default function DashboardPage() {
           : "scraped";
 
     let valueStr = "";
-    if (e.value_number != null) valueStr = String(e.value_number);
+    if (e.field_name === "compensation_amount") {
+      valueStr = formatCompensationAmount(e.value_number ?? null);
+    } else if (e.field_name === "salary_per_hour") {
+      valueStr =
+        e.value_number != null
+          ? formatCompensation(e.value_number, "hourly")
+          : "N/A";
+    } else if (e.field_name === "salary_yearly") {
+      valueStr =
+        e.value_number != null
+          ? formatCompensation(e.value_number, "yearly")
+          : "N/A";
+    } else if (e.field_name === "salary_type" && e.value_text && isSalaryType(e.value_text)) {
+      valueStr = SALARY_TYPE_LABELS[e.value_text as SalaryType];
+    } else if (e.value_number != null) valueStr = String(e.value_number);
     else if (e.value_text) valueStr = e.value_text;
     else if (e.value_date) valueStr = e.value_date;
     else if (e.value_status) valueStr = STATUS_LABELS[e.value_status];
@@ -309,7 +335,46 @@ export default function DashboardPage() {
     );
   }
 
-  // filters out inactive email events and builds the timeline
+  function applyCompensationEventLocally(
+    fieldName: string,
+    event: ApplicationFieldEvent,
+    result: Record<string, unknown>,
+    seen: Set<string>,
+  ) {
+    if (fieldName === "compensation_amount") {
+      if (!seen.has("compensation_amount")) {
+        result.compensation_amount = event.value_number ?? null;
+        seen.add("compensation_amount");
+      }
+      return true;
+    }
+
+    if (fieldName === "salary_type") {
+      if (!seen.has("salary_type")) {
+        result.salary_type =
+          event.value_text && isSalaryType(event.value_text)
+            ? event.value_text
+            : null;
+        seen.add("salary_type");
+      }
+      return true;
+    }
+
+    if (fieldName === "salary_per_hour" || fieldName === "salary_yearly") {
+      if (!seen.has("compensation_amount")) {
+        result.compensation_amount = event.value_number ?? null;
+        seen.add("compensation_amount");
+      }
+      if (!seen.has("salary_type")) {
+        result.salary_type = fieldName === "salary_yearly" ? "yearly" : "hourly";
+        seen.add("salary_type");
+      }
+      return true;
+    }
+
+    return false;
+  }
+
   function buildFilteredTimeline(
     emailsList: ApplicationEmail[],
     eventsList: ApplicationFieldEvent[],
@@ -350,6 +415,10 @@ export default function DashboardPage() {
       const f = ev.field_name;
       if (ev.email_id != null && inactiveEmailIds.has(ev.email_id)) continue;
 
+      if (applyCompensationEventLocally(f, ev, result, seen)) {
+        continue;
+      }
+
       if (seen.has(f)) continue;
       seen.add(f);
 
@@ -366,7 +435,8 @@ export default function DashboardPage() {
     return {
       ...app,
       status,
-      salary_per_hour: (result.salary_per_hour as number | null) ?? null,
+      compensation_amount: (result.compensation_amount as number | null) ?? null,
+      salary_type: (result.salary_type as SalaryType | null) ?? null,
       location_type: (result.location_type as Application["location_type"]) ?? null,
       location: (result.location as string | null) ?? null,
       contact_person: (result.contact_person as string | null) ?? null,
@@ -540,6 +610,9 @@ export default function DashboardPage() {
       locationFilter === "all" || app.location_type === locationFilter;
     return matchesSearch && matchesStatus && matchesLocation;
   });
+  const allFilteredAppsSelected =
+    filteredApps.length > 0 &&
+    filteredApps.every((app) => selectedApplicationIds.has(app.id));
 
   function handleApplicationCreated(app: Application) {
     setApplications((prev) => [app, ...prev]);
@@ -692,16 +765,61 @@ export default function DashboardPage() {
     if (bulkDeletingApplications) return;
     setAppsSelectMode((prev) => !prev);
     setSelectedApplicationIds(new Set());
+    lastSelectedApplicationIdRef.current = null;
   }
 
-  function handleToggleApplicationSelected(appId: number) {
+  function handleToggleApplicationSelected(appId: number, shiftKey = false) {
     if (bulkDeletingApplications) return;
+
+    const anchorId = lastSelectedApplicationIdRef.current;
+    const hasRangeAnchor = shiftKey && anchorId != null && anchorId !== appId;
+    const rangeIds = hasRangeAnchor
+      ? (() => {
+          const startIndex = filteredApps.findIndex((app) => app.id === anchorId);
+          const endIndex = filteredApps.findIndex((app) => app.id === appId);
+          if (startIndex === -1 || endIndex === -1) return [];
+          const [from, to] =
+            startIndex < endIndex
+              ? [startIndex, endIndex]
+              : [endIndex, startIndex];
+          return filteredApps.slice(from, to + 1).map((app) => app.id);
+        })()
+      : [];
+
     setSelectedApplicationIds((prev) => {
       const next = new Set(prev);
-      if (next.has(appId)) next.delete(appId);
-      else next.add(appId);
+
+      if (rangeIds.length > 0) {
+        const shouldSelectRange = !next.has(appId);
+        rangeIds.forEach((id) => {
+          if (shouldSelectRange) next.add(id);
+          else next.delete(id);
+        });
+      } else if (next.has(appId)) {
+        next.delete(appId);
+      } else {
+        next.add(appId);
+      }
+
       return next;
     });
+
+    lastSelectedApplicationIdRef.current = appId;
+  }
+
+  function handleSelectAllApplications() {
+    if (bulkDeletingApplications) return;
+    if (filteredApps.length === 0) return;
+
+    setSelectedApplicationIds(new Set(filteredApps.map((app) => app.id)));
+    lastSelectedApplicationIdRef.current =
+      filteredApps[filteredApps.length - 1]?.id ?? null;
+  }
+
+  function handleClearSelectedApplications() {
+    if (bulkDeletingApplications) return;
+    setSelectedApplicationIds(new Set());
+    lastSelectedApplicationIdRef.current = null;
   }
 
   function handleRequestBulkDeleteApplications() {
@@ -994,7 +1112,10 @@ export default function DashboardPage() {
                   onLocationFilterChange={setLocationFilter}
                   selectMode={appsSelectMode}
                   selectedIds={selectedApplicationIds}
+                  allSelected={allFilteredAppsSelected}
                   onToggleSelectMode={handleToggleApplicationsSelectMode}
+                  onSelectAll={handleSelectAllApplications}
+                  onClearSelected={handleClearSelectedApplications}
                   onToggleSelected={handleToggleApplicationSelected}
                   onDeleteSelected={handleRequestBulkDeleteApplications}
                 />

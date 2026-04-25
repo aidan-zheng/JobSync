@@ -15,6 +15,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Link2, PenLine, Loader2 } from "lucide-react";
 import {
+  getCompensationFieldLabel,
+  getCompensationPlaceholder,
+  SALARY_TYPES,
+} from "@/lib/compensation";
+import {
   APPLICATION_TEXT_LIMITS,
   getLimitedTextValue,
 } from "@/lib/application-field-limits";
@@ -27,8 +32,13 @@ import type {
   Application,
   ApplicationStatus,
   LocationType,
+  SalaryType,
 } from "@/types/applications";
-import { STATUS_LABELS, LOCATION_LABELS } from "@/types/applications";
+import {
+  STATUS_LABELS,
+  LOCATION_LABELS,
+  SALARY_TYPE_LABELS,
+} from "@/types/applications";
 import styles from "../dashboard.module.css";
 
 interface NewApplicationModalProps {
@@ -50,7 +60,8 @@ const EMPTY_FORM = {
   job_url: "",
   company_name: "",
   job_title: "",
-  salary_per_hour: "",
+  compensation_amount: "",
+  salary_type: "hourly" as SalaryType,
   location_type: "" as LocationType | "",
   location: "",
   date_applied: getLocalDateInputValue(),
@@ -123,8 +134,8 @@ export default function NewApplicationModal({
         return;
       }
 
-      const salaryPerHour = parseOptionalNumber(form.salary_per_hour);
-      const salaryValidationError = getSalaryValidationError(salaryPerHour);
+      const compensationAmount = parseOptionalNumber(form.compensation_amount);
+      const salaryValidationError = getSalaryValidationError(compensationAmount);
       if (salaryValidationError) {
         setError(salaryValidationError);
         return;
@@ -140,7 +151,11 @@ export default function NewApplicationModal({
           mode: "manual" as const,
           company_name: form.company_name.trim(),
           job_title: form.job_title.trim(),
-          salary_per_hour: parseOptionalNumber(form.salary_per_hour) ?? null,
+          compensation_amount: parseOptionalNumber(form.compensation_amount) ?? null,
+          salary_type:
+            parseOptionalNumber(form.compensation_amount) != null
+              ? form.salary_type
+              : null,
           location_type: form.location_type || null,
           location: form.location.trim() || null,
           date_applied: form.date_applied || getLocalDateInputValue(),
@@ -254,19 +269,39 @@ export default function NewApplicationModal({
 
               <div className={styles.formField}>
                 <Label htmlFor="salary" className={styles.formLabel}>
-                  Hourly Salary (0+)
+                  {getCompensationFieldLabel(form.salary_type)}
                 </Label>
                 <Input
                   id="salary"
                   type="text"
                   inputMode="decimal"
-                  placeholder="e.g. 45"
-                  value={form.salary_per_hour}
+                  placeholder={getCompensationPlaceholder(form.salary_type)}
+                  value={form.compensation_amount}
                   onChange={(e) =>
-                    updateField("salary_per_hour", e.target.value)
+                    updateField("compensation_amount", e.target.value)
                   }
                   className={styles.formInput}
                 />
+              </div>
+
+              <div className={styles.formField}>
+                <Label htmlFor="salary-type" className={styles.formLabel}>
+                  Salary Type
+                </Label>
+                <select
+                  id="salary-type"
+                  value={form.salary_type}
+                  onChange={(e) =>
+                    updateField("salary_type", e.target.value as SalaryType)
+                  }
+                  className={styles.formSelect}
+                >
+                  {SALARY_TYPES.map((salaryType) => (
+                    <option key={salaryType} value={salaryType}>
+                      {SALARY_TYPE_LABELS[salaryType]}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className={styles.formField}>
