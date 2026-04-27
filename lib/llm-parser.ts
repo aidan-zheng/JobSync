@@ -144,7 +144,7 @@ export interface BatchRelevanceResult {
  * Batch processes multiple emails at once using header models.
  */
 export async function checkRelevanceBatch(
-  emails: { messageId: string; subject: string; sender: string }[],
+  emails: { messageId: string; subject: string; sender: string; snippet?: string }[],
   applications: { application_id: number; company_name: string; job_title: string }[],
 ): Promise<BatchRelevanceResult[]> {
   if (emails.length === 0) return [];
@@ -154,13 +154,14 @@ export async function checkRelevanceBatch(
     .join("\n");
 
   const emailList = emails
-    .map((e) => `ID: ${e.messageId}\nSubject: "${e.subject}"\nSender: "${e.sender}"\n---`)
+    .map((e) => `ID: ${e.messageId}\nSubject: "${e.subject}"\nSender: "${e.sender}"\nSnippet: "${e.snippet ? e.snippet.replace(/\n/g, ' ') : ''}"\n---`)
     .join("\n");
 
   const systemPrompt = `You are an AI assistant that determines whether emails are related to job applications.
-You will be given a list of emails (subject and sender) and a list of the user's tracked job applications.
+You will be given a list of emails (subject, sender, and a short body snippet) and a list of the user's tracked job applications.
 
-Respond ONLY with a JSON object containing a "results" array. Each object in the array MUST have:
+Respond ONLY with a JSON object containing a "results" array. You MUST return exactly one object for EACH email in the input list.
+Each object in the array MUST have:
 - "messageId": string — exactly matching the ID provided
 - "relevant": boolean — true if the email is about a job application update (status change, interview invite, rejection, offer, etc.)
 - "matched_application_id": number or null — the ID of the matching application if found, or null if relevance is unclear or no match
@@ -168,6 +169,9 @@ Respond ONLY with a JSON object containing a "results" array. Each object in the
 - "reason": string — brief explanation
 
 Rules:
+- CRITICAL: You must evaluate EACH email INDEPENDENTLY against the list of tracked job applications.
+- You MUST return exactly one result object in the array for EACH email provided in the input list. Use the exact "messageId" for each.
+- Ensure you match each email to the CORRECT job application. Do NOT apply the same matched_application_id to all emails unless they truly belong to the same application.
 - If an email is unequivocally from or about a company that is NOT on the user's tracked list, you MUST mark it as irrelevant ("relevant": false) and "matched_application_id": null. Do not force a match.
 - Common relevant emails: interview invitations, application confirmations, rejections, offer letters.
 - Common irrelevant emails: marketing, newsletters, personal emails, receipts.`;
@@ -185,13 +189,18 @@ ${emailList}`;
 
   try {
     const parsed = extractJson(raw);
-    return parsed.results || emails.map(e => ({
-      messageId: e.messageId,
-      relevant: false,
-      matched_application_id: null,
-      confidence: "low",
-      reason: "No results array returned"
-    }));
+    const results = parsed.results || [];
+    return emails.map(e => {
+      const found = results.find((r: any) => r.messageId === e.messageId);
+      if (found) return found;
+      return {
+        messageId: e.messageId,
+        relevant: false,
+        matched_application_id: null,
+        confidence: "low",
+        reason: "LLM missed this email in response"
+      };
+    });
   } catch (err) {
     console.error(`[Stage 1] Failed to parse LLM JSON:`, err, "\nRaw output:", raw);
     return emails.map(e => ({
