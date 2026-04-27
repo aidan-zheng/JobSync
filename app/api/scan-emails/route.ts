@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     const chunkResults = await Promise.all(
       chunk.map(async (batch) => {
         const relevanceResults = await checkRelevanceBatch(
-          batch.map(m => ({ messageId: m.messageId, subject: m.subject, sender: m.from })),
+          batch.map(m => ({ messageId: m.messageId, subject: m.subject, sender: m.from, snippet: m.body.slice(0, 150) })),
           applications.map((a) => ({
             application_id: a.application_id,
             company_name: a.company_name,
