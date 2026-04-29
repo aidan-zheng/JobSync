@@ -121,13 +121,12 @@ export default function EmailViewerModal({
     >
       <motion.div
         className={styles.emailViewerModal}
-        initial={{ opacity: 0, scale: 0.96, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 20 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         transition={{
-          duration: 0.4,
-          ease: [0.16, 1, 0.3, 1],
-          opacity: { duration: 0.2 }
+          duration: 0.2,
+          ease: "easeInOut"
         }}
         onClick={(e) => e.stopPropagation()}
       >

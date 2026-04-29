@@ -12,19 +12,31 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && data?.session) {
-      // Store Google provider token for Gmail API access
       const providerToken = data.session.provider_token
       const providerRefreshToken = data.session.provider_refresh_token
 
       if (providerToken) {
         try {
           const admin = createAdminClient()
+          const userId = data.session.user.id
+
+          let refreshTokenToStore = providerRefreshToken ?? null
+          if (!refreshTokenToStore) {
+            const { data: existing } = await admin
+              .from('user_tokens')
+              .select('refresh_token')
+              .eq('user_id', userId)
+              .eq('provider', 'google')
+              .single()
+            refreshTokenToStore = existing?.refresh_token ?? null
+          }
+
           await admin.from('user_tokens').upsert(
             {
-              user_id: data.session.user.id,
+              user_id: userId,
               provider: 'google',
               access_token: providerToken,
-              refresh_token: providerRefreshToken ?? null,
+              refresh_token: refreshTokenToStore,
               expires_at: data.session.expires_at
                 ? new Date(data.session.expires_at * 1000).toISOString()
                 : null,

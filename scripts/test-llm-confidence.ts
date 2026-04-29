@@ -45,7 +45,6 @@ async function runConfidenceTests() {
     console.log("--- Stage 1 Outcomes ---");
     stage1Results.forEach(r => {
       console.log(`Email [${r.messageId}] -> Relevant: ${r.relevant} | Confidence: ${r.confidence}`);
-      if (r.relevant) console.log(`   Reason: ${r.reason}`);
     });
   } catch (err) {
     console.error("Stage 1 test failed:", err);

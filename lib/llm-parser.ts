@@ -136,7 +136,6 @@ export interface BatchRelevanceResult {
   relevant: boolean;
   matched_application_id: number | null;
   confidence: "high" | "medium" | "low";
-  reason: string;
 }
 
 /**
@@ -166,10 +165,10 @@ Each object in the array MUST have:
 - "relevant": boolean — true if the email is about a job application update (status change, interview invite, rejection, offer, etc.)
 - "matched_application_id": number or null — the ID of the matching application if found, or null if relevance is unclear or no match
 - "confidence": "high" | "medium" | "low" — how confident you are
-- "reason": string — brief explanation
 
 Rules:
 - CRITICAL: You must evaluate EACH email INDEPENDENTLY against the list of tracked job applications.
+- COMPANY MISMATCH: If an email is explicitly regarding one company (e.g. "IBM") and the user tracks a different company (e.g. "Acme Corp"), the email is 100% IRRELEVANT. Do not force a match across disparate companies.
 - You MUST return exactly one result object in the array for EACH email provided in the input list. Use the exact "messageId" for each.
 - Ensure you match each email to the CORRECT job application. Do NOT apply the same matched_application_id to all emails unless they truly belong to the same application.
 - If an email is unequivocally from or about a company that is NOT on the user's tracked list, you MUST mark it as irrelevant ("relevant": false) and "matched_application_id": null. Do not force a match.
@@ -197,8 +196,7 @@ ${emailList}`;
         messageId: e.messageId,
         relevant: false,
         matched_application_id: null,
-        confidence: "low",
-        reason: "LLM missed this email in response"
+        confidence: "low"
       };
     });
   } catch (err) {
@@ -207,8 +205,7 @@ ${emailList}`;
       messageId: e.messageId,
       relevant: false,
       matched_application_id: null,
-      confidence: "low",
-      reason: "Failed to parse LLM response"
+      confidence: "low"
     }));
   }
 }
@@ -256,6 +253,7 @@ Return ONLY a JSON object with these fields (set to null if not mentioned/change
 - "location": string or null — city/office location if mentioned
 - "contact_person": string or null — recruiter or hiring manager name. ONLY extract this if a person explicitly introduces themselves or signs off in the email body. DO NOT guess it from the sender email address.
 - "notes": string or null — any other important details worth noting (interview date/time, next steps, etc.). Keep this concise (1-2 lines). 
+- "confidence": "high" | "medium" | "low" — how confident you are about the extracted field data
 
 Rules:
 - CRITICAL: If the email is clearly focused on a different company than "${currentApplication.company_name}", you MUST assume this email is irrelevant and return null for ALL fields to prevent false positive updates.

@@ -19,7 +19,6 @@ export interface RelevantEmailResult {
   company_name: string;
   job_title: string;
   confidence: string;
-  reason: string;
   body: string;
 }
 
@@ -176,7 +175,6 @@ export async function POST(request: NextRequest) {
           company_name: matchedApp.company_name,
           job_title: matchedApp.job_title,
           confidence: relevance.confidence,
-          reason: relevance.reason,
           body: message.body,
         });
       }
