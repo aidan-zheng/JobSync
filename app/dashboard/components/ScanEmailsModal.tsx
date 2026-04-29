@@ -113,6 +113,7 @@ export default function ScanEmailsModal({
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [hasRefetched, setHasRefetched] = useState(false);
 
   // Load settings when the modal opens
   const loadSettings = useCallback(async () => {
@@ -190,11 +191,14 @@ export default function ScanEmailsModal({
     setPreviewEmail(null);
     setStartDate(weekAgo);
     setEndDate(today);
+    setHasRefetched(false);
   }
 
   function handleOpenChange(next: boolean) {
     if (!next) {
-      if (phase === "done") onScanComplete();
+      if ((phase === "done" || phase === "processing") && !hasRefetched) {
+        onScanComplete();
+      }
       reset();
     }
     onOpenChange(next);
@@ -272,6 +276,8 @@ export default function ScanEmailsModal({
 
       setStage2(data as Stage2Result);
       setPhase("done");
+      onScanComplete();
+      setHasRefetched(true);
     } catch (err) {
       setPhase("error");
       setError(err instanceof Error ? err.message : "Network error");
