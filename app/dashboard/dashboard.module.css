@@ -1542,6 +1542,16 @@
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
 }
 
+.formSelect:disabled,
+.formInput:disabled {
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+  color: #9ca3af !important;
+  background-color: #f3f4f6 !important;
+  border-color: var(--jobsync-border) !important;
+}
+
 .formError {
   margin-top: 0.5rem;
   font-size: 0.8rem;
@@ -1577,8 +1587,6 @@
 .spinner {
   animation: spin 0.7s linear infinite;
 }
-
-/* ── Email Viewer Modal ── */
 
 .emailViewerOverlay {
   position: fixed;
@@ -2005,6 +2013,137 @@
 
 .scanError p {
   margin: 0;
+}
+
+.autoScanSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.autoScanToggleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.autoScanToggleLabel {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--jobsync-text);
+  margin-bottom: 0.2rem;
+}
+
+.autoScanToggleHint {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: var(--jobsync-text-muted);
+  line-height: 1.4;
+  max-width: 340px;
+}
+
+/* Toggle switch */
+.autoScanToggle {
+  flex-shrink: 0;
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: var(--jobsync-border-strong);
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+  margin-top: 2px;
+}
+
+.autoScanToggleOn {
+  background: var(--jobsync-brand);
+}
+
+.autoScanToggleThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.autoScanToggleOn .autoScanToggleThumb {
+  transform: translateX(18px);
+}
+
+.autoScanDivider {
+  border: none;
+  border-top: 1px solid var(--jobsync-border);
+  margin: 0;
+}
+
+.autoScanHint {
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.72rem;
+  color: var(--jobsync-text-muted);
+  line-height: 1.4;
+  margin-top: 0.1rem;
+}
+
+.autoScanStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.78rem;
+  color: var(--jobsync-text-muted);
+  padding-top: 0.25rem;
+}
+
+.autoScanStatusLabel {
+  font-weight: 600;
+  color: var(--jobsync-text-muted);
+}
+
+.autoScanStatusValue {
+  color: var(--jobsync-text);
+  font-weight: 500;
+}
+
+.autoScanResetBtn {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #dc2626;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  transition: background-color 0.1s, opacity 0.1s;
+}
+
+.autoScanResetBtn:hover {
+  background-color: rgba(220, 38, 38, 0.08);
+  opacity: 0.9;
+}
+
+.autoScanSavedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  border-radius: 6px;
+  padding: 0.3rem 0.65rem;
+  width: fit-content;
 }
 
 .emailsLoading {
