@@ -497,7 +497,7 @@ export default function ScanEmailsModal({
                       <div>
                         <div className={styles.autoScanToggleLabel}>Enable Daily Auto-Scan</div>
                         <div className={styles.autoScanToggleHint}>
-                          Scans your inbox daily. Only high-confidence matches are automatically added.
+                          Scans your inbox daily.
                         </div>
                       </div>
                       <button
