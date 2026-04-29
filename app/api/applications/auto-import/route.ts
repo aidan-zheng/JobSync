@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/supabase/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { parseJobPage } from "@/lib/llm-parser";
 import type {
   ApplicationStatus,
   LocationType,
@@ -9,32 +10,21 @@ import type {
 
 type AutoImportBody = {
   job_url?: string | null;
+  pasted_text?: string | null;
 };
 
 type ExtractionFields = {
   company_name?: unknown;
   job_title?: unknown;
-  salary_per_hour?: unknown;
+  compensation_amount?: unknown;
+  salary_type?: unknown;
   location_type?: unknown;
   location?: unknown;
   contact_person?: unknown;
   notes?: unknown;
 };
 
-type UrlCheckerHandlers = {
-  link?: (result: unknown, customData?: unknown) => void;
-  end?: () => void;
-};
 
-type BrokenLinkCheckerModule = {
-  UrlChecker: new (options: unknown, handlers: UrlCheckerHandlers) => {
-    enqueue: (
-      url: string,
-      baseUrl?: string,
-      customData?: unknown,
-    ) => unknown;
-  };
-};
 
 const MANUAL_DEFAULTS = {
   company_name: "Company",
@@ -48,16 +38,29 @@ const MANUAL_DEFAULTS = {
   notes: null as string | null,
 };
 
-const USER_AGENT = "Pipply/auto-import (contact: dev@example.com)";
+const USER_AGENT = "Pipply/auto-import (contact: dev@pipply.vercel.com)";
 const MAX_HTML_CHARS = 300_000;
 const MAX_TEXT_CHARS = 12_000;
-const CHECKER_TIMEOUT_MS = 4_000;
 const FETCH_TIMEOUT_MS = 15_000;
 
 function normalizeHttpUrl(input: string): string | null {
   try {
-    const u = new URL(input);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    let cleanInput = input.trim();
+    if (!cleanInput) return null;
+
+    // accept http or https
+    if (/^https?:\/\//i.test(cleanInput)) {
+      const u = new URL(cleanInput);
+      return u.toString();
+    }
+
+    // reject ftp or other protocols
+    if (/^[a-zA-Z0-9+.-]+:\/\//i.test(cleanInput)) {
+      return null;
+    }
+
+    // prepend https:// without protocol
+    const u = new URL("https://" + cleanInput);
     return u.toString();
   } catch {
     return null;
@@ -75,6 +78,28 @@ function stripHtmlToText(html: string): string {
   );
   const withoutTags = withoutStyles.replace(/<\/?[^>]+(>|$)/g, " ");
   return withoutTags.replace(/\s+/g, " ").trim();
+}
+
+function cleanPastedText(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const filtered = lines.filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+
+    // Skip common boilerplate
+    if (/copyright|terms of (?:service|use)|privacy policy|cookie policy/i.test(trimmed)) return false;
+
+    // Skip very short lines that are purely navigation or UI noise
+    if (trimmed.length < 20) {
+      const lower = trimmed.toLowerCase();
+      if (['home', 'jobs', 'careers', 'about', 'contact', 'sign in', 'log in', 'sign up', 'register', 'menu', 'navigation', 'search', 'filter'].includes(lower)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+  return filtered.join('\n');
 }
 
 function truncate(text: string, maxChars: number): string {
@@ -141,7 +166,8 @@ function extractHeuristics(html: string, text: string) {
   return {
     company_name: company_name || null,
     job_title: job_title || null,
-    salary_per_hour,
+    compensation_amount: salary_per_hour,
+    salary_type: salary_per_hour != null ? "hourly" : null,
     location_type,
     location: location ?? null,
     contact_person,
@@ -163,82 +189,10 @@ async function fetchWithTimeout(
   }
 }
 
-async function checkUrlReachability(
-  url: string,
-): Promise<{ broken: boolean; brokenReason?: string }> {
-  return await new Promise((resolve) => {
-    let settled = false;
-    let broken = true;
-    let brokenReason: string | undefined;
 
-    const finish = (result: {
-      broken: boolean;
-      brokenReason?: string;
-    }) => {
-      if (settled) return;
-      settled = true;
-      resolve(result);
-    };
 
-    const timeoutId = setTimeout(() => {
-      finish({ broken: true, brokenReason: "TIMEOUT" });
-    }, CHECKER_TIMEOUT_MS);
-
-    void (async () => {
-      try {
-        const mod = (await import("broken-link-checker")) as unknown as
-          BrokenLinkCheckerModule;
-
-        const urlChecker = new mod.UrlChecker(
-          {
-            acceptedSchemes: ["http", "https"],
-            requestMethod: "get",
-            cacheResponses: false,
-            maxSockets: 1,
-            maxSocketsPerHost: 1,
-            rateLimit: 0,
-            honorRobotExclusions: true,
-          },
-          {
-            link: (result: unknown) => {
-              if (typeof result !== "object" || result === null) return;
-              const maybeBroken = (result as { broken?: unknown }).broken;
-              if (maybeBroken === true) broken = true;
-              else if (maybeBroken === false) broken = false;
-
-              const maybeReason = (result as {
-                brokenReason?: unknown;
-              }).brokenReason;
-              if (typeof maybeReason === "string") brokenReason = maybeReason;
-            },
-            end: () => {
-              clearTimeout(timeoutId);
-              finish({ broken, brokenReason });
-            },
-          },
-        );
-
-        urlChecker.enqueue(url, url);
-      } catch {
-        clearTimeout(timeoutId);
-        finish({ broken: true, brokenReason: "CHECKER_FAILED" });
-      }
-    })();
-  });
-}
-
-async function extractWithAI(_truncatedText: string) {
-  /**
-   * AI extraction hook (currently stubbed).
-   *
-   * Input: `_truncatedText` is plain text derived from the fetched HTML:
-   * - scripts/styles/tags stripped
-   * - truncated to `MAX_TEXT_CHARS`
-   *
-   * Expected output: return an `ExtractionFields`-shaped object or `null`.
-   */
-  void _truncatedText;
-  return null;
+async function extractWithAI(truncatedText: string) {
+  return await parseJobPage(truncatedText);
 }
 
 export async function POST(request: NextRequest) {
@@ -250,46 +204,73 @@ export async function POST(request: NextRequest) {
   }
 
   const jobUrl = typeof body?.job_url === "string" ? body.job_url.trim() : "";
-  const normalizedJobUrl = jobUrl ? normalizeHttpUrl(jobUrl) : null;
-  if (!normalizedJobUrl) {
+  const pastedText = typeof body?.pasted_text === "string" ? body.pasted_text.trim() : "";
+
+  if (!jobUrl && !pastedText) {
     return NextResponse.json(
-      { error: "Missing or invalid job_url (http/https required)." },
+      { error: "Missing job_url or pasted_text." },
       { status: 400 },
     );
   }
 
-  const checker = await checkUrlReachability(normalizedJobUrl);
+  let text = "";
+  let safeHtml = "";
+  let normalizedJobUrl: string | null = null;
 
-  const htmlResp = await fetchWithTimeout(
-    normalizedJobUrl,
-    {
-      method: "GET",
-      redirect: "follow",
-      headers: { "user-agent": USER_AGENT },
-    },
-    FETCH_TIMEOUT_MS,
-  );
+  if (pastedText) {
+    text = truncate(cleanPastedText(pastedText), MAX_TEXT_CHARS);
+  } else {
+    normalizedJobUrl = normalizeHttpUrl(jobUrl);
+    if (!normalizedJobUrl) {
+      return NextResponse.json(
+        { error: "Missing or invalid job_url." },
+        { status: 400 },
+      );
+    }
 
-  if (!htmlResp.ok) {
-    return NextResponse.json(
-      {
-        error: `Failed to fetch job page (status ${htmlResp.status}).`,
-        checker_reason: checker.brokenReason ?? null,
-        checker_broken: checker.broken,
-      },
-      { status: 400 },
-    );
+    let htmlResp: Response;
+    try {
+      htmlResp = await fetchWithTimeout(
+        normalizedJobUrl,
+        {
+          method: "GET",
+          redirect: "follow",
+          headers: { "user-agent": USER_AGENT },
+        },
+        FETCH_TIMEOUT_MS,
+      );
+    } catch (err: any) {
+      return NextResponse.json(
+        { error: `Fetch failed: ${err?.message || "Unknown error"}.` },
+        { status: 400 },
+      );
+    }
+
+    if (!htmlResp.ok) {
+      return NextResponse.json(
+        { error: `Fetch failed. (Status ${htmlResp.status}). Web page may be protected. Try the 'Paste Text' tab.` },
+        { status: 400 },
+      );
+    }
+
+    const html = await htmlResp.text();
+    safeHtml = html.slice(0, MAX_HTML_CHARS);
+    text = truncate(stripHtmlToText(safeHtml), MAX_TEXT_CHARS);
   }
-
-  const html = await htmlResp.text();
-  const safeHtml = html.slice(0, MAX_HTML_CHARS);
-
-  const text = truncate(stripHtmlToText(safeHtml), MAX_TEXT_CHARS);
 
   const modelExtraction = await extractWithAI(text);
   const heuristics = extractHeuristics(safeHtml, text);
 
-  const extracted = (modelExtraction ?? heuristics) as ExtractionFields;
+  const extracted: ExtractionFields = {
+    company_name: modelExtraction?.company_name ?? heuristics.company_name,
+    job_title: modelExtraction?.job_title ?? heuristics.job_title,
+    compensation_amount: modelExtraction?.compensation_amount ?? heuristics.compensation_amount,
+    salary_type: modelExtraction?.salary_type ?? heuristics.salary_type,
+    location_type: modelExtraction?.location_type ?? heuristics.location_type,
+    location: modelExtraction?.location ?? heuristics.location,
+    contact_person: modelExtraction?.contact_person ?? heuristics.contact_person,
+    notes: modelExtraction?.notes ?? heuristics.notes,
+  };
 
   const date_applied = new Date().toISOString().slice(0, 10);
   const status = MANUAL_DEFAULTS.status;
@@ -297,22 +278,30 @@ export async function POST(request: NextRequest) {
   const locationTypeRaw = extracted.location_type;
   const location_type: LocationType | null =
     locationTypeRaw === "remote" ||
-    locationTypeRaw === "hybrid" ||
-    locationTypeRaw === "on_site"
+      locationTypeRaw === "hybrid" ||
+      locationTypeRaw === "on_site"
       ? (locationTypeRaw as LocationType)
       : null;
 
-  const salaryRaw = extracted.salary_per_hour;
-  const salaryPerHourRaw =
-    typeof salaryRaw === "number" ? salaryRaw : null;
-  const salaryPerHourFromString =
-    typeof salaryRaw === "string" ? Number(salaryRaw) : null;
+  const compensationRaw = extracted.compensation_amount;
   const safeSalary =
-    Number.isFinite(salaryPerHourRaw)
-      ? salaryPerHourRaw
-      : Number.isFinite(salaryPerHourFromString)
-        ? salaryPerHourFromString
+    typeof compensationRaw === "number" && Number.isFinite(compensationRaw)
+      ? compensationRaw
+      : typeof compensationRaw === "string" && Number.isFinite(Number(compensationRaw))
+        ? Number(compensationRaw)
         : null;
+
+  const salaryTypeRaw = extracted.salary_type;
+  const salary_type: SalaryType | null =
+    salaryTypeRaw === "hourly" ||
+      salaryTypeRaw === "weekly" ||
+      salaryTypeRaw === "biweekly" ||
+      salaryTypeRaw === "monthly" ||
+      salaryTypeRaw === "yearly"
+      ? (salaryTypeRaw as SalaryType)
+      : safeSalary != null
+        ? "yearly"
+        : MANUAL_DEFAULTS.salary_type;
 
   const row = {
     company_name:
@@ -324,7 +313,7 @@ export async function POST(request: NextRequest) {
         ? extracted.job_title.trim()
         : MANUAL_DEFAULTS.job_title,
     compensation_amount: safeSalary,
-    salary_type: safeSalary != null ? "hourly" : MANUAL_DEFAULTS.salary_type,
+    salary_type,
     location_type,
     location:
       typeof extracted.location === "string" && extracted.location.trim()
@@ -341,6 +330,16 @@ export async function POST(request: NextRequest) {
         ? extracted.notes.trim()
         : null,
   };
+
+  if (row.company_name === MANUAL_DEFAULTS.company_name || row.job_title === MANUAL_DEFAULTS.job_title) {
+    const errorMsg = pastedText
+      ? "Could not extract details from pasted text. Please verify the content or enter manually."
+      : "Could not extract details from URL. Try copying content into the 'Paste Text' tab.";
+    return NextResponse.json(
+      { error: errorMsg },
+      { status: 400 }
+    );
+  }
 
   const user = await getApiUser(request);
   if (!user) {

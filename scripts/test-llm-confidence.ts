@@ -37,6 +37,18 @@ async function runConfidenceTests() {
       messageId: "msg-extremely-vague",
       subject: "Following up",
       sender: "some-guy@gmail.com"
+    },
+    {
+      messageId: "msg-footer-match",
+      subject: "Update regarding your application",
+      sender: "no-reply@job-portal.com",
+      snippet: "Hi applicant, we have received your info and are assessing credentials. [...] Best regards, the engineering team at Acme Corp."
+    },
+    {
+      messageId: "msg-footer-mismatch",
+      subject: "Update regarding your application",
+      sender: "no-reply@job-portal.com",
+      snippet: "Hi applicant, we have received your info and are assessing credentials. [...] Best regards, the engineering team at Wayne Enterprises."
     }
   ];
 

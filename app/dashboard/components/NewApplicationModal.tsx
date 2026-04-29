@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Link2, PenLine, Loader2 } from "lucide-react";
+import { Link2, PenLine, Loader2, ClipboardList } from "lucide-react";
 import {
   getCompensationFieldLabel,
   getCompensationPlaceholder,
@@ -47,7 +47,7 @@ interface NewApplicationModalProps {
   onCreated: (app: Application) => void;
 }
 
-type Mode = "automatic" | "manual";
+type Mode = "automatic" | "paste" | "manual";
 
 function getLocalDateString(d: Date = new Date()): string {
   const year = d.getFullYear();
@@ -58,6 +58,7 @@ function getLocalDateString(d: Date = new Date()): string {
 
 const EMPTY_FORM = {
   job_url: "",
+  pasted_text: "",
   company_name: "",
   job_title: "",
   compensation_amount: "",
@@ -128,6 +129,11 @@ export default function NewApplicationModal({
         setError("Please enter a job listing URL.");
         return;
       }
+    } else if (mode === "paste") {
+      if (!form.pasted_text.trim()) {
+        setError("Please paste the job listing content.");
+        return;
+      }
     } else {
       if (!form.company_name.trim() || !form.job_title.trim()) {
         setError("Company name and job title are required.");
@@ -137,6 +143,9 @@ export default function NewApplicationModal({
       const compensationAmount = parseOptionalNumber(form.compensation_amount);
       const salaryValidationError = getSalaryValidationError(compensationAmount);
       if (salaryValidationError) {
+        if (typeof compensationAmount === "number" && compensationAmount < 0) {
+          return;
+        }
         setError(salaryValidationError);
         return;
       }
@@ -147,22 +156,24 @@ export default function NewApplicationModal({
     const body =
       mode === "automatic"
         ? { mode: "automatic" as const, job_url: form.job_url.trim() }
-        : {
-          mode: "manual" as const,
-          company_name: form.company_name.trim(),
-          job_title: form.job_title.trim(),
-          compensation_amount: parseOptionalNumber(form.compensation_amount) ?? null,
-          salary_type:
-            parseOptionalNumber(form.compensation_amount) != null
-              ? form.salary_type
-              : null,
-          location_type: form.location_type || null,
-          location: form.location.trim() || null,
-          date_applied: form.date_applied || getLocalDateInputValue(),
-          contact_person: form.contact_person.trim() || null,
-          status: form.status,
-          notes: form.notes.trim() || null,
-        };
+        : mode === "paste"
+          ? { mode: "automatic" as const, pasted_text: form.pasted_text.trim() }
+          : {
+            mode: "manual" as const,
+            company_name: form.company_name.trim(),
+            job_title: form.job_title.trim(),
+            compensation_amount: parseOptionalNumber(form.compensation_amount) ?? null,
+            salary_type:
+              parseOptionalNumber(form.compensation_amount) != null
+                ? form.salary_type
+                : null,
+            location_type: form.location_type || null,
+            location: form.location.trim() || null,
+            date_applied: form.date_applied || getLocalDateInputValue(),
+            contact_person: form.contact_person.trim() || null,
+            status: form.status,
+            notes: form.notes.trim() || null,
+          };
 
     const res = await fetch("/api/applications", {
       method: "POST",
@@ -204,7 +215,15 @@ export default function NewApplicationModal({
             onClick={() => setMode("automatic")}
           >
             <Link2 size={15} />
-            Automatic
+            URL Import
+          </button>
+          <button
+            type="button"
+            className={`${styles.modeBtn} ${mode === "paste" ? styles.modeBtnActive : ""}`}
+            onClick={() => setMode("paste")}
+          >
+            <ClipboardList size={15} />
+            Paste Text
           </button>
           <button
             type="button"
@@ -233,6 +252,25 @@ export default function NewApplicationModal({
               {renderCharacterHint("job_url")}
               <p className={styles.autoHint}>
                 We&apos;ll scrape the listing and fill in the details for you.
+              </p>
+            </div>
+          ) : mode === "paste" ? (
+            <div className={styles.autoSection}>
+              <Label htmlFor="pasted-text" className={styles.formLabel}>
+                Job Listing Content
+              </Label>
+              <Textarea
+                id="pasted-text"
+                placeholder="Ctrl+A and Ctrl+V the job listing page here..."
+                value={form.pasted_text}
+                onChange={(e) => updateField("pasted_text", e.target.value)}
+                className={styles.formInput}
+                rows={8}
+                maxLength={APPLICATION_TEXT_LIMITS.pasted_text}
+              />
+              {renderCharacterHint("pasted_text")}
+              <p className={styles.autoHint}>
+                We&apos;ll parse the paste and fill in the details for you .
               </p>
             </div>
           ) : (
@@ -268,8 +306,12 @@ export default function NewApplicationModal({
               </div>
 
               <div className={styles.formField}>
-                <Label htmlFor="salary" className={styles.formLabel}>
-                  {getCompensationFieldLabel(form.salary_type)}
+                <Label
+                  htmlFor="salary"
+                  className={styles.formLabel}
+                  style={{ color: (parseOptionalNumber(form.compensation_amount) ?? 0) < 0 ? "#ef4444" : undefined }}
+                >
+                  {getCompensationFieldLabel(form.salary_type)} {(parseOptionalNumber(form.compensation_amount) ?? 0) < 0 && "(0 or more)"}
                 </Label>
                 <Input
                   id="salary"

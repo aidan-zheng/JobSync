@@ -38,6 +38,12 @@ function getApiKeys(): string[] {
     throw new Error("Missing GROQ_API_KEY environment variable(s)");
   }
 
+  // key shuffle for rate limits
+  for (let i = keys.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [keys[i], keys[j]] = [keys[j], keys[i]];
+  }
+
   return keys;
 }
 
@@ -156,24 +162,13 @@ export async function checkRelevanceBatch(
     .map((e) => `ID: ${e.messageId}\nSubject: "${e.subject}"\nSender: "${e.sender}"\nSnippet: "${e.snippet ? e.snippet.replace(/\n/g, ' ') : ''}"\n---`)
     .join("\n");
 
-  const systemPrompt = `You are an AI assistant that determines whether emails are related to job applications.
-You will be given a list of emails (subject, sender, and a short body snippet) and a list of the user's tracked job applications.
-
-Respond ONLY with a JSON object containing a "results" array. You MUST return exactly one object for EACH email in the input list.
-Each object in the array MUST have:
-- "messageId": string — exactly matching the ID provided
-- "relevant": boolean — true if the email is about a job application update (status change, interview invite, rejection, offer, etc.)
-- "matched_application_id": number or null — the ID of the matching application if found, or null if relevance is unclear or no match
-- "confidence": "high" | "medium" | "low" — how confident you are
-
+  const systemPrompt = `You are a job application relevance filter. Match emails to tracked applications.
+Return a JSON object: { "results": [{"messageId": string, "relevant": boolean, "matched_application_id": number|null, "confidence": "high"|"medium"|"low"}] }
 Rules:
-- CRITICAL: You must evaluate EACH email INDEPENDENTLY against the list of tracked job applications.
-- COMPANY MISMATCH: If an email is explicitly regarding one company (e.g. "IBM") and the user tracks a different company (e.g. "Acme Corp"), the email is 100% IRRELEVANT. Do not force a match across disparate companies.
-- You MUST return exactly one result object in the array for EACH email provided in the input list. Use the exact "messageId" for each.
-- Ensure you match each email to the CORRECT job application. Do NOT apply the same matched_application_id to all emails unless they truly belong to the same application.
-- If an email is unequivocally from or about a company that is NOT on the user's tracked list, you MUST mark it as irrelevant ("relevant": false) and "matched_application_id": null. Do not force a match.
-- Common relevant emails: interview invitations, application confirmations, rejections, offer letters.
-- Common irrelevant emails: marketing, newsletters, personal emails, receipts.`;
+1. Evaluate each email independently. Match exactly one object per incoming email ID.
+2. Set "relevant": true only for core updates (interview invites, offers, rejections, application confirmations).
+3. "matched_application_id" requires a high certainty company match. Scan email body snippets and standard signature/footer areas carefully for company identity.
+4. Set "relevant": false for newsletters, personal email, marketing, or general spam.`;
 
   const userPrompt = `User's tracked job applications:
 ${appList || "  (No applications tracked yet)"}
@@ -242,27 +237,19 @@ export async function parseEmailBody(
   // Truncate very long bodies to avoid token limits
   const truncatedBody = body.length > 4000 ? body.slice(0, 4000) + "\n[...truncated]" : body;
 
-  const systemPrompt = `You are an AI assistant that extracts structured job application updates from email content.
-Given an email about a job application, extract any field updates.
-
-Return ONLY a JSON object with these fields (set to null if not mentioned/changed):
-- "status": one of "draft", "applied", "interviewing", "offer", "rejected", "withdrawn", "ghosted" — or null if no status change detected
-- "compensation_amount": number or null — the compensation value if mentioned
-- "salary_type": one of "hourly", "weekly", "biweekly", "monthly", "yearly" — or null if no compensation is mentioned
-- "location_type": one of "remote", "hybrid", "on_site" — or null
-- "location": string or null — city/office location if mentioned
-- "contact_person": string or null — recruiter or hiring manager name. ONLY extract this if a person explicitly introduces themselves or signs off in the email body. DO NOT guess it from the sender email address.
-- "notes": string or null — any other important details worth noting (interview date/time, next steps, etc.). Keep this concise (1-2 lines). 
-- "confidence": "high" | "medium" | "low" — how confident you are about the extracted field data
-
+  const systemPrompt = `Extract structured job application updates for "${currentApplication.company_name}" (current status: "${currentApplication.status}").
+Return ONLY a JSON object:
+- "status": "draft"|"applied"|"interviewing"|"offer"|"rejected"|"withdrawn"|"ghosted"|null
+- "compensation_amount": number|null
+- "salary_type": "hourly"|"weekly"|"biweekly"|"monthly"|"yearly"|null
+- "location_type": "remote"|"hybrid"|"on_site"|null
+- "location": string|null
+- "contact_person": explicit recruiter/manager name only (do not guess from email)
+- "notes": 1-2 line logistical context (next steps, dates)
+- "confidence": "high"|"medium"|"low"
 Rules:
-- CRITICAL: If the email is clearly focused on a different company than "${currentApplication.company_name}", you MUST assume this email is irrelevant and return null for ALL fields to prevent false positive updates.
-- If the email is an interview invitation → status should be "interviewing"
-- If it's a rejection → status should be "rejected"
-- If it's an offer → status should be "offer"
-- If it's an application confirmation → status should be "applied"
-- Only extract fields that are clearly stated in the email.
-- The current application status is "${currentApplication.status}". Only change it if the email clearly indicates a different status.`;
+1. If focusing on a mismatched company, set all updates to null.
+2. Infer status safely (confirmations->applied, rejections->rejected, invites->interviewing, offers->offer).`;
 
   const userPrompt = `Application: ${currentApplication.company_name} — ${currentApplication.job_title} (current status: ${currentApplication.status})
 
@@ -311,5 +298,55 @@ ${truncatedBody}`;
       notes: null,
       confidence: "low" as const,
     };
+  }
+}
+
+/**
+ * Job Scraping Extractor for the automated job importer
+ */
+export async function parseJobPage(text: string): Promise<{
+  company_name: string | null;
+  job_title: string | null;
+  location: string | null;
+  location_type: string | null;
+  compensation_amount: number | null;
+  salary_type: string | null;
+  contact_person: string | null;
+  notes: string | null;
+} | null> {
+  const systemPrompt = `You are an assistant that extracts details from job postings.
+Return ONLY a JSON object (all null if unknown):
+- "company_name": string or null
+- "job_title": string or null
+- "location": string or null (Format: City, ST)
+- "location_type": "remote"|"hybrid"|"on_site"|null
+- "compensation_amount": number or null
+- "salary_type": "hourly"|"weekly"|"biweekly"|"monthly"|"yearly"|null
+- "contact_person": string or null
+- "notes": string or null (concise 1-2 lines on qualifications)`;
+
+  const userPrompt = `Job Posting Text:
+${text}`;
+
+  const raw = await callGroqWithRetry([
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt },
+  ], "body");
+
+  try {
+    const parsed = extractJson(raw);
+    return {
+      company_name: parsed.company_name ?? null,
+      job_title: parsed.job_title ?? null,
+      location: parsed.location ?? null,
+      location_type: parsed.location_type ?? null,
+      compensation_amount: parsed.compensation_amount != null ? Number(parsed.compensation_amount) : null,
+      salary_type: parsed.salary_type ?? null,
+      contact_person: parsed.contact_person ?? null,
+      notes: parsed.notes ?? null,
+    };
+  } catch (err) {
+    console.error(`[Scraper Parsing] Failed to parse LLM JSON:`, err, "\nRaw:", raw);
+    return null;
   }
 }

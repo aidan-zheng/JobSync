@@ -295,6 +295,8 @@ export default function ScanEmailsModal({
 
   const FIELD_LABELS: Record<string, string> = {
     status: "Status",
+    compensation_amount: "Compensation",
+    salary_type: "Salary Type",
     salary_per_hour: "Salary / hour",
     location_type: "Location type",
     location: "Location",

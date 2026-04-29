@@ -55,7 +55,7 @@ const MANUAL_DEFAULTS = {
 };
 
 export type CreateApplicationBody =
-  | { mode: "automatic"; job_url?: string }
+  | { mode: "automatic"; job_url?: string; pasted_text?: string }
   | {
     mode: "manual";
     company_name?: string;
@@ -80,15 +80,56 @@ export async function POST(request: NextRequest) {
 
   const mode = body?.mode ?? "manual";
 
+  if (mode === "automatic") {
+    const jobUrl = "job_url" in body ? body.job_url : "";
+    const pastedText = "pasted_text" in body ? body.pasted_text : "";
+    if (!jobUrl && !pastedText) {
+      return NextResponse.json({ error: "Missing job_url or pasted_text" }, { status: 400 });
+    }
+
+    if (pastedText && pastedText.length > APPLICATION_TEXT_LIMITS.pasted_text) {
+      return NextResponse.json(
+        { error: `Pasted text must be ${APPLICATION_TEXT_LIMITS.pasted_text} characters or fewer` },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const baseUrl = request.nextUrl.origin;
+      const autoImportResp = await fetch(`${baseUrl}/api/applications/auto-import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cookie": request.headers.get("Cookie") || "",
+          "Authorization": request.headers.get("Authorization") || "",
+        },
+        body: JSON.stringify({ job_url: jobUrl, pasted_text: pastedText }),
+      });
+
+      if (!autoImportResp.ok) {
+        const errText = await autoImportResp.text();
+        let parsedErr;
+        try { parsedErr = JSON.parse(errText); } catch { parsedErr = null; }
+        return NextResponse.json(
+          { error: parsedErr?.error || "Auto-import proxy failed" },
+          { status: autoImportResp.status }
+        );
+      }
+
+      const autoImportData = await autoImportResp.json();
+      return NextResponse.json(autoImportData);
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message || "Internal network failure" }, { status: 500 });
+    }
+  }
+
   const manual =
-    mode === "automatic"
-      ? { mode: "manual" as const, ...MANUAL_DEFAULTS }
-      : body.mode === "manual"
-        ? body
-        : { mode: "manual" as const, ...MANUAL_DEFAULTS };
+    body.mode === "manual"
+      ? body
+      : { mode: "manual" as const, ...MANUAL_DEFAULTS };
 
   const limitedTextFields = [
-    ["job_url", mode === "automatic" && "job_url" in body ? body.job_url ?? "" : ""],
+    ["job_url", ""],
     ["company_name", manual.company_name ?? ""],
     ["job_title", manual.job_title ?? ""],
     ["location", manual.location ?? ""],
@@ -168,10 +209,7 @@ export async function POST(request: NextRequest) {
   if (auth.errorResponse) return auth.errorResponse;
   const { user, admin } = auth;
 
-  const jobUrl =
-    mode === "automatic" && "job_url" in body && body.job_url
-      ? body.job_url.trim()
-      : null;
+  const jobUrl = null;
 
   const { data: parentRow, error: parentError } = await admin
     .from("applications")
@@ -204,7 +242,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const sourceType = mode === "automatic" ? "scrape" : "manual";
+  const sourceType = "manual";
 
   // prevents date shifts
   const dateObj = parseDateOnly(row.date_applied);

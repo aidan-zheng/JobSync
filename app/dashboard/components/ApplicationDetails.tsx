@@ -259,6 +259,9 @@ export default function ApplicationDetails({
       field_name === "compensation_amount" &&
       getSalaryValidationError(rawValue as number | null | undefined)
     ) {
+      if (typeof rawValue === "number" && rawValue < 0) {
+        return;
+      }
       alert(getSalaryValidationError(rawValue as number | null | undefined));
       return;
     }
@@ -690,7 +693,16 @@ export default function ApplicationDetails({
             <div key={i} className={styles.detailField}>
               <div className={styles.fieldRow}>
                 <div className={styles.fieldGroup}>
-                  <span className={styles.fieldLabel}>{field.label}</span>
+                  <span 
+                    className={styles.fieldLabel}
+                    style={{ 
+                      color: (field.fieldName === "compensation_amount" && editingField === "compensation_amount" && (parseOptionalNumber(editValue) ?? 0) < 0) 
+                        ? "#ef4444" 
+                        : undefined 
+                    }}
+                  >
+                    {field.label} {(field.fieldName === "compensation_amount" && editingField === "compensation_amount" && (parseOptionalNumber(editValue) ?? 0) < 0) && "(0 or more)"}
+                  </span>
                   <div className={styles.fieldValueRow}>
                     {field.fieldName
                       ? renderEditOrValue(

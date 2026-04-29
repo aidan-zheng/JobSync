@@ -70,10 +70,10 @@ export function formatCompensationAmount(amount: number | null) {
 
 export function getCompensationFieldLabel(salaryType: SalaryType | null) {
   if (!salaryType) {
-    return "Compensation (0 or more)";
+    return "Compensation";
   }
 
-  return `${SALARY_TYPE_LABELS[salaryType]} Compensation (0 or more)`;
+  return `${SALARY_TYPE_LABELS[salaryType]} Compensation`;
 }
 
 export function getCompensationPlaceholder(salaryType: SalaryType | null) {

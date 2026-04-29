@@ -143,7 +143,26 @@ export async function POST(request: NextRequest) {
     const chunkResults = await Promise.all(
       chunk.map(async (batch) => {
         const relevanceResults = await checkRelevanceBatch(
-          batch.map(m => ({ messageId: m.messageId, subject: m.subject, sender: m.from, snippet: m.body.slice(0, 150) })),
+          batch.map(m => {
+            const cleanBody = (m.body || "").replace(/\s+/g, ' ').trim();
+            const headerText = `${m.subject} ${m.from}`.toLowerCase();
+            const hasCompanyInHeader = applications.some(app => 
+              app.company_name && headerText.includes(app.company_name.toLowerCase())
+            );
+
+            const smartSnippet = hasCompanyInHeader
+              ? cleanBody.slice(0, 150)
+              : cleanBody.length <= 300 
+                ? cleanBody 
+                : `${cleanBody.slice(0, 150)} [...] ${cleanBody.slice(-150)}`;
+
+            return { 
+              messageId: m.messageId, 
+              subject: m.subject, 
+              sender: m.from, 
+              snippet: smartSnippet 
+            };
+          }),
           applications.map((a) => ({
             application_id: a.application_id,
             company_name: a.company_name,
