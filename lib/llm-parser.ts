@@ -62,7 +62,7 @@ async function callGroq(messages: GroqMessage[], model: string, apiKey: string):
     body: JSON.stringify({
       model,
       messages,
-      temperature: 0.1,
+      temperature: 0,
       max_tokens: 1024,
       response_format: { type: "json_object" },
     }),
@@ -133,6 +133,15 @@ function extractJson(raw: string): any {
     cleaned = cleaned.slice(0, -3);
   }
   return JSON.parse(cleaned.trim());
+}
+
+function robustNumber(val: any): number | null {
+  if (val == null) return null;
+  if (typeof val === 'number') return isFinite(val) ? val : null;
+
+  const cleaned = String(val).replace(/[$,]/g, '');
+  const parsed = parseFloat(cleaned);
+  return isFinite(parsed) ? parsed : null;
 }
 
 // Stage 1: Relevance Check 
@@ -278,7 +287,7 @@ ${truncatedBody}`;
 
     return {
       status: parsed.status ? parsed.status.toLowerCase() : null,
-      compensation_amount: parsed.compensation_amount != null ? Number(parsed.compensation_amount) : null,
+      compensation_amount: robustNumber(parsed.compensation_amount),
       salary_type: parsed.salary_type ? parsed.salary_type.toLowerCase() : null,
       location_type: parsed.location_type ? parsed.location_type.toLowerCase() : null,
       location: parsed.location ?? null,
@@ -322,7 +331,7 @@ Return ONLY a JSON object (all null if unknown):
 - "job_title": string or null
 - "location": string or null (Format: City, ST)
 - "location_type": "remote"|"hybrid"|"on_site"|null
-- "compensation_amount": number or null (0 for explicitly unpaid roles)
+- "compensation_amount": number or null (0 for explicitly unpaid roles). If a range is provided, return the average/midpoint.
 - "salary_type": "hourly"|"weekly"|"biweekly"|"monthly"|"yearly"|null
 - "contact_person": string or null
 - "notes": string or null (concise 1-2 lines on qualifications)
@@ -348,7 +357,7 @@ Please extract the details only from the content within the tags above.`;
       job_title: parsed.job_title ?? null,
       location: parsed.location ?? null,
       location_type: parsed.location_type ?? null,
-      compensation_amount: parsed.compensation_amount != null ? Number(parsed.compensation_amount) : null,
+      compensation_amount: robustNumber(parsed.compensation_amount),
       salary_type: parsed.salary_type ?? null,
       contact_person: parsed.contact_person ?? null,
       notes: parsed.notes ?? null,
