@@ -322,7 +322,7 @@ Return ONLY a JSON object (all null if unknown):
 - "job_title": string or null
 - "location": string or null (Format: City, ST)
 - "location_type": "remote"|"hybrid"|"on_site"|null
-- "compensation_amount": number or null
+- "compensation_amount": number or null (0 for explicitly unpaid roles)
 - "salary_type": "hourly"|"weekly"|"biweekly"|"monthly"|"yearly"|null
 - "contact_person": string or null
 - "notes": string or null (concise 1-2 lines on qualifications)`;
