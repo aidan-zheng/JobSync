@@ -22,6 +22,7 @@ type ExtractionFields = {
   location?: unknown;
   contact_person?: unknown;
   notes?: unknown;
+  is_job_posting?: unknown;
 };
 
 
@@ -258,6 +259,21 @@ export async function POST(request: NextRequest) {
     text = truncate(stripHtmlToText(safeHtml), MAX_TEXT_CHARS);
   }
 
+  const jobKeywords = [
+    "apply", "requirements", "qualifications", "responsibilities",
+    "experience", "resume", "salary", "compensation", "benefits",
+    "equal opportunity", "skills", "full-time", "part-time", "contract", "degree"
+  ];
+  const textLower = text.toLowerCase();
+  const matchCount = jobKeywords.filter(kw => textLower.includes(kw)).length;
+
+  if (matchCount < 2) {
+    return NextResponse.json(
+      { error: "Not a valid job posting (failed keyword check)." },
+      { status: 400 }
+    );
+  }
+
   const modelExtraction = await extractWithAI(text);
   const heuristics = extractHeuristics(safeHtml, text);
 
@@ -331,12 +347,22 @@ export async function POST(request: NextRequest) {
         : null,
   };
 
-  if (row.company_name === MANUAL_DEFAULTS.company_name || row.job_title === MANUAL_DEFAULTS.job_title) {
+  const isJobPosting = modelExtraction?.is_job_posting ?? true;
+
+  if (!isJobPosting || row.company_name === MANUAL_DEFAULTS.company_name || row.job_title === MANUAL_DEFAULTS.job_title) {
     const errorMsg = pastedText
-      ? "Could not extract details from pasted text. Please verify the content or enter manually."
-      : "Could not extract details from URL. Try copying content into the 'Paste Text' tab.";
+      ? "Not a job posting or missing details. Enter manually."
+      : "Not a job posting or missing details. Try 'Paste Text' or enter manually.";
     return NextResponse.json(
       { error: errorMsg },
+      { status: 400 }
+    );
+  }
+
+  const hasCompensation = row.compensation_amount != null && row.salary_type != null;
+  if (!hasCompensation) {
+    return NextResponse.json(
+      { error: "No compensation detected. Please enter manually." },
       { status: 400 }
     );
   }

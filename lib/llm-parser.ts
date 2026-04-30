@@ -305,6 +305,7 @@ ${truncatedBody}`;
  * Job Scraping Extractor for the automated job importer
  */
 export async function parseJobPage(text: string): Promise<{
+  is_job_posting: boolean;
   company_name: string | null;
   job_title: string | null;
   location: string | null;
@@ -316,6 +317,7 @@ export async function parseJobPage(text: string): Promise<{
 } | null> {
   const systemPrompt = `You are an assistant that extracts details from job postings.
 Return ONLY a JSON object (all null if unknown):
+- "is_job_posting": boolean
 - "company_name": string or null
 - "job_title": string or null
 - "location": string or null (Format: City, ST)
@@ -336,6 +338,7 @@ ${text}`;
   try {
     const parsed = extractJson(raw);
     return {
+      is_job_posting: parsed.is_job_posting ?? false,
       company_name: parsed.company_name ?? null,
       job_title: parsed.job_title ?? null,
       location: parsed.location ?? null,
