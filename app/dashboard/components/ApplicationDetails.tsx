@@ -19,6 +19,8 @@ import { formatDateOnly, getLocalDateInputValue } from "@/lib/date-only";
 import {
   getSalaryValidationError,
   parseOptionalNumber,
+  INVALID_SALARY_INPUT_ERROR,
+  NON_NEGATIVE_SALARY_ERROR,
 } from "@/lib/salary-validation";
 import type {
   Application,
@@ -259,10 +261,6 @@ export default function ApplicationDetails({
       field_name === "compensation_amount" &&
       getSalaryValidationError(rawValue as number | null | undefined)
     ) {
-      if (typeof rawValue === "number" && rawValue < 0) {
-        return;
-      }
-      alert(getSalaryValidationError(rawValue as number | null | undefined));
       return;
     }
 
@@ -701,12 +699,18 @@ export default function ApplicationDetails({
                   <span 
                     className={styles.fieldLabel}
                     style={{ 
-                      color: (field.fieldName === "compensation_amount" && editingField === "compensation_amount" && (parseOptionalNumber(editValue) ?? 0) < 0) 
+                      color: (field.fieldName === "compensation_amount" && editingField === "compensation_amount" && getSalaryValidationError(parseOptionalNumber(editValue))) 
                         ? "#ef4444" 
                         : undefined 
                     }}
                   >
-                    {field.label} {(field.fieldName === "compensation_amount" && editingField === "compensation_amount" && (parseOptionalNumber(editValue) ?? 0) < 0) && "(0 or more)"}
+                    {field.label} 
+                    {(field.fieldName === "compensation_amount" && editingField === "compensation_amount") && (
+                      <>
+                        {getSalaryValidationError(parseOptionalNumber(editValue)) === NON_NEGATIVE_SALARY_ERROR && " (0 or more)"}
+                        {getSalaryValidationError(parseOptionalNumber(editValue)) === INVALID_SALARY_INPUT_ERROR && " (numbers only)"}
+                      </>
+                    )}
                   </span>
                   <div className={styles.fieldValueRow}>
                     {field.fieldName

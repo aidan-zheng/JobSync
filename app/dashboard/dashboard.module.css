@@ -717,7 +717,6 @@
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--jobsync-text-muted);
-  text-transform: capitalize;
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
 }
 

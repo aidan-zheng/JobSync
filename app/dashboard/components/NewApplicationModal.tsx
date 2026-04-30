@@ -27,6 +27,8 @@ import { getLocalDateInputValue } from "@/lib/date-only";
 import {
   getSalaryValidationError,
   parseOptionalNumber,
+  INVALID_SALARY_INPUT_ERROR,
+  NON_NEGATIVE_SALARY_ERROR,
 } from "@/lib/salary-validation";
 import type {
   Application,
@@ -140,13 +142,7 @@ export default function NewApplicationModal({
         return;
       }
 
-      const compensationAmount = parseOptionalNumber(form.compensation_amount);
-      const salaryValidationError = getSalaryValidationError(compensationAmount);
-      if (salaryValidationError) {
-        if (typeof compensationAmount === "number" && compensationAmount < 0) {
-          return;
-        }
-        setError(salaryValidationError);
+      if (getSalaryValidationError(parseOptionalNumber(form.compensation_amount))) {
         return;
       }
     }
@@ -309,9 +305,15 @@ export default function NewApplicationModal({
                 <Label
                   htmlFor="salary"
                   className={styles.formLabel}
-                  style={{ color: (parseOptionalNumber(form.compensation_amount) ?? 0) < 0 ? "#ef4444" : undefined }}
+                  style={{
+                    color: getSalaryValidationError(parseOptionalNumber(form.compensation_amount))
+                      ? "#ef4444"
+                      : undefined
+                  }}
                 >
-                  {getCompensationFieldLabel(form.salary_type)} {(parseOptionalNumber(form.compensation_amount) ?? 0) < 0 && "(0 or more)"}
+                  {getCompensationFieldLabel(form.salary_type)}
+                  {getSalaryValidationError(parseOptionalNumber(form.compensation_amount)) === NON_NEGATIVE_SALARY_ERROR && " (0 or more)"}
+                  {getSalaryValidationError(parseOptionalNumber(form.compensation_amount)) === INVALID_SALARY_INPUT_ERROR && " (numbers only)"}
                 </Label>
                 <Input
                   id="salary"
