@@ -381,7 +381,12 @@ export default function ApplicationDetails({
       },
     ];
 
-  const sortedEmails = [...emails].sort((a, b) => (a.linked === b.linked ? 0 : a.linked ? -1 : 1));
+  const sortedEmails = [...emails].sort((a, b) => {
+    if (a.linked !== b.linked) return a.linked ? -1 : 1;
+    const dateA = a.received_date ? new Date(a.received_date).getTime() : 0;
+    const dateB = b.received_date ? new Date(b.received_date).getTime() : 0;
+    return dateB - dateA;
+  });
 
   function renderEditOrValue(
     fieldName: ApplicationFieldName,
@@ -947,12 +952,6 @@ export default function ApplicationDetails({
                       <span className={styles.emailRowTime}>
                         {(() => {
                           const d = new Date(email.received_date);
-                          const now = new Date();
-                          const diffMs = now.getTime() - d.getTime();
-                          const diffDays = Math.floor(diffMs / 86400000);
-                          if (diffDays === 0) return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-                          if (diffDays === 1) return "Yesterday";
-                          if (diffDays < 7) return d.toLocaleDateString("en-US", { weekday: "short" });
                           return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
                         })()}
                       </span>
