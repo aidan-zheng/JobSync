@@ -167,7 +167,7 @@ export default function ApplicationDetails({
     setSelectMode(false);
     setEditingEmailNote(null);
     setEmailNoteEditValue("");
-  }, [application?.id]);
+  }, [application?.id, application?.updated_at]);
 
   useEffect(() => {
     setSelectedEmailIds((prev) => {

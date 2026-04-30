@@ -171,13 +171,16 @@ export async function checkRelevanceBatch(
     .map((e) => `ID: ${e.messageId}\nSubject: "${e.subject}"\nSender: "${e.sender}"\nSnippet: "${e.snippet ? e.snippet.replace(/\n/g, ' ') : ''}"\n---`)
     .join("\n");
 
-  const systemPrompt = `You are a job application relevance filter. Match emails to tracked applications.
+  const systemPrompt = `You are a job application relevance filter. Match incoming emails to the user's tracked applications.
 Return a JSON object: { "results": [{"messageId": string, "relevant": boolean, "matched_application_id": number|null, "confidence": "high"|"medium"|"low"}] }
+
 Rules:
-1. Evaluate each email independently. Match exactly one object per incoming email ID.
-2. Set "relevant": true only for core updates (interview invites, offers, rejections, application confirmations).
-3. "matched_application_id" requires a high certainty company match. Scan email body snippets and standard signature/footer areas carefully for company identity.
-4. Set "relevant": false for newsletters, personal email, marketing, or general spam.`;
+1. Evaluate each email independently.
+2. Set "relevant": true ONLY for core updates: interview invites, offers, rejections, or application confirmations.
+3. CRITICAL: "matched_application_id" requires a strict company name match. If an email identifies a company (e.g., "ASML") that is NOT one of the user's tracked companies (e.g., "AcmeCorp"), set "relevant": false even if the job title is similar.
+4. If an email is a generic notification from a platform (LinkedIn, Indeed, ZipRecruiter) and does NOT explicitly mention one of the user's tracked companies in the subject or snippet, set "relevant": false.
+5. Ignore newsletters, marketing, personal email, or general job alerts ("Jobs you might like").
+6. If uncertain, set "relevant": false and confidence: "low".`;
 
   const userPrompt = `User's tracked job applications:
 ${appList || "  (No applications tracked yet)"}

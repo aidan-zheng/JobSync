@@ -560,7 +560,7 @@ export default function DashboardPage() {
       const events = eventsData as ApplicationFieldEvent[];
       setRawEvents(events);
       rawEventsRef.current = events;
-      
+
       const newTimeline = buildFilteredTimeline(emailsRef.current, events, selectedApp.application_id);
       setTimeline(newTimeline);
 
@@ -632,8 +632,8 @@ export default function DashboardPage() {
   const toggleCooldownRef = useRef<Set<number>>(new Set());
 
   function rebuildTimelineFromEmails(nextEmails: ApplicationEmail[]) {
-    const events = rawEventsRef.current;
-    const app = selectedAppRef.current;
+    const events = rawEvents;
+    const app = selectedApp;
     if (!app) return;
 
     const nextTimeline = buildFilteredTimeline(nextEmails, events, app.application_id);
@@ -667,15 +667,14 @@ export default function DashboardPage() {
       prev?.link_id === linkId ? { ...prev, linked: newActive } : prev,
     );
 
-    const app = selectedAppRef.current;
-    const events = rawEventsRef.current;
+    const app = selectedApp;
+    const events = rawEvents;
     if (app) {
       const recalculated = recalculateAppLocally(app, events, nextEmails);
       setApplications((prev) =>
         prev.map((a) => (a.id === recalculated.id ? recalculated : a)),
       );
       setSelectedApp(recalculated);
-      selectedAppRef.current = recalculated;
       rebuildTimelineFromEmails(nextEmails);
     }
 
@@ -779,15 +778,15 @@ export default function DashboardPage() {
     const hasRangeAnchor = shiftKey && anchorId != null && anchorId !== appId;
     const rangeIds = hasRangeAnchor
       ? (() => {
-          const startIndex = filteredApps.findIndex((app) => app.id === anchorId);
-          const endIndex = filteredApps.findIndex((app) => app.id === appId);
-          if (startIndex === -1 || endIndex === -1) return [];
-          const [from, to] =
-            startIndex < endIndex
-              ? [startIndex, endIndex]
-              : [endIndex, startIndex];
-          return filteredApps.slice(from, to + 1).map((app) => app.id);
-        })()
+        const startIndex = filteredApps.findIndex((app) => app.id === anchorId);
+        const endIndex = filteredApps.findIndex((app) => app.id === appId);
+        if (startIndex === -1 || endIndex === -1) return [];
+        const [from, to] =
+          startIndex < endIndex
+            ? [startIndex, endIndex]
+            : [endIndex, startIndex];
+        return filteredApps.slice(from, to + 1).map((app) => app.id);
+      })()
       : [];
 
     setSelectedApplicationIds((prev) => {
@@ -1146,10 +1145,10 @@ export default function DashboardPage() {
               <Separator className={styles.resizeHandle} />
 
               <Panel id="sidebar" defaultSize="30%" minSize="20%" maxSize="40%">
-                <EmailsTimeline 
+                <EmailsTimeline
                   applicationId={selectedApp?.id ?? ""}
-                  timeline={timeline} 
-                  isLoading={relatedDataLoading} 
+                  timeline={timeline}
+                  isLoading={relatedDataLoading}
                 />
               </Panel>
             </Group>
@@ -1312,14 +1311,16 @@ export default function DashboardPage() {
         open={showScanModal}
         onOpenChange={setShowScanModal}
         onScanComplete={async () => {
-          // invalidate cache since scan might have affected any application
+          // trying to fix bad updates here
           setRelatedDataCache({});
+
           const nextApps = await refetchApplications();
-          // refresh related data for the currently selected app
-          const currentId = selectedAppRef.current?.id;
-          const app = (currentId && nextApps) ? nextApps.find((a: Application) => a.id === currentId) : null;
-          if (app) {
-            await loadRelatedData(app, true);
+
+          const currentId = selectedApp?.id;
+          const freshApp = nextApps.find((a: Application) => a.id === currentId);
+
+          if (freshApp) {
+            await loadRelatedData(freshApp, true);
           }
         }}
       />
