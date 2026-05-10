@@ -53,6 +53,19 @@ interface Stage2Result {
   }[];
 }
 
+async function readJsonResponse(res: Response) {
+  const text = await res.text();
+  if (!text.trim()) return null;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(
+      `Server returned an unreadable response (${res.status} ${res.statusText}).`,
+    );
+  }
+}
+
 function formatDate(d: Date): string {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -108,11 +121,20 @@ export default function ScanEmailsModal({
         body: JSON.stringify({ start_date: startDate, end_date: endDate }),
       });
 
-      const data = await res.json();
+      const data = await readJsonResponse(res);
 
       if (!res.ok) {
         setPhase("error");
-        setError(data?.error ?? "Scan failed.");
+        setError(
+          (data as { error?: string } | null)?.error ??
+            `Scan failed (${res.status}).`,
+        );
+        return;
+      }
+
+      if (!data) {
+        setPhase("error");
+        setError("Scan failed: server returned an empty response.");
         return;
       }
 
@@ -158,11 +180,20 @@ export default function ScanEmailsModal({
         body: JSON.stringify({ emails: approvedEmails }),
       });
 
-      const data = await res.json();
+      const data = await readJsonResponse(res);
 
       if (!res.ok) {
         setPhase("error");
-        setError(data?.error ?? "Processing failed.");
+        setError(
+          (data as { error?: string } | null)?.error ??
+            `Processing failed (${res.status}).`,
+        );
+        return;
+      }
+
+      if (!data) {
+        setPhase("error");
+        setError("Processing failed: server returned an empty response.");
         return;
       }
 
