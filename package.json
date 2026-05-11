@@ -6,9 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "auth:ed": "node --env-file=.env swap-google-auth.js edScope",
-    "auth:itai": "node --env-file=.env swap-google-auth.js itaiScope"
+    "lint": "eslint"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
