@@ -178,7 +178,7 @@
   background: var(--jobsync-border-strong);
 }
 
-/* Left Panel – Applications List */
+/* Left Panel - Applications List */
 
 .applicationsPanel {
   display: flex;
@@ -500,7 +500,7 @@
   min-width: 0;
 }
 
-/* Center Panel – Application Details */
+/* Center Panel - Application Details */
 
 .detailsPanel {
   height: 100%;
@@ -1038,7 +1038,7 @@
   transform: translateX(14px);
 }
 
-/* Right Panel – Emails & Timeline */
+/* Right Panel - Emails & Timeline */
 
 .rightPanel {
   height: 100%;

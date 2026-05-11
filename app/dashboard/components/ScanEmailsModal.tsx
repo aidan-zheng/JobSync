@@ -496,7 +496,7 @@ export default function ScanEmailsModal({
                 {settingsLoading ? (
                   <div className={styles.scanProgress}>
                     <Loader2 size={22} className={styles.spinner} />
-                    <p className={styles.scanProgressHint}>Loading settings…</p>
+                    <p className={styles.scanProgressHint}>Loading settings...</p>
                   </div>
                 ) : (
                   <>
@@ -680,7 +680,7 @@ export default function ScanEmailsModal({
                   {settingsSaving ? (
                     <>
                       <Loader2 size={14} className={styles.spinner} style={{ marginRight: "0.35rem" }} />
-                      Saving…
+                      Saving...
                     </>
                   ) : (
                     "Save Settings"

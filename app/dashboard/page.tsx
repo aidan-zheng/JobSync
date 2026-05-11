@@ -70,10 +70,9 @@ export default function DashboardPage() {
   const [emails, setEmails] = useState<ApplicationEmail[]>([]);
   const [rawEvents, setRawEvents] = useState<ApplicationFieldEvent[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [relatedDataLoading, setRelatedDataLoading] = useState(false);
 
-  // cache for related data (emails and events) keyed by application ID (currentAppId)
+  // Cache related email and event data by current application ID.
   const [relatedDataCache, setRelatedDataCache] = useState<
     Record<
       number,
@@ -138,7 +137,6 @@ export default function DashboardPage() {
       rawEventsRef.current = [];
       selectedAppRef.current = null;
       beginRelatedDataRequest();
-      setLoading(true);
       setApplications([]);
       setSelectedApp(null);
       setEmails([]);
@@ -198,7 +196,6 @@ export default function DashboardPage() {
 
     const requestId = beginApplicationsRequest();
     const userId = user.id;
-    setLoading(true);
     const res = await fetch("/api/applications", { credentials: "include" });
     const data = await res.json().catch(() => []);
 
@@ -224,7 +221,6 @@ export default function DashboardPage() {
       });
     }
 
-    setLoading(false);
     return res.ok && Array.isArray(data) ? data : [];
   }
 
@@ -432,7 +428,7 @@ export default function DashboardPage() {
       }
     }
 
-    // Default values if no active events exist for these fields
+    // Fall back when no active events exist for these fields.
     const status = (result.status as ApplicationStatus) ?? "applied";
     const date_applied = (result.date_applied as string) ?? new Date().toISOString().slice(0, 10);
 
@@ -918,7 +914,7 @@ export default function DashboardPage() {
     setShowDeleteEmailsModal(false);
     setEmailsToDelete([]);
 
-    // prevent any in-flight related-data fetch from overwriting optimistic UI updates
+    // Prevent in-flight related-data fetches from overwriting optimistic UI updates.
     beginRelatedDataRequest();
 
     const linkIds = toDelete.map((e) => e.link_id);
@@ -948,7 +944,7 @@ export default function DashboardPage() {
     const currentApp = selectedAppRef.current;
     const deleteTargetAppId = currentApp?.id ?? null;
 
-    // trigger loading immediately to provide visual feedback for the one and only refresh
+    // Show loading immediately while the refreshed data is fetched.
     setRelatedDataLoading(true);
 
     fetch("/api/emails", {
@@ -1311,7 +1307,7 @@ export default function DashboardPage() {
         open={showScanModal}
         onOpenChange={setShowScanModal}
         onScanComplete={async () => {
-          // trying to fix bad updates here
+          // Clear stale related data before reloading applications after a scan.
           setRelatedDataCache({});
 
           const nextApps = await refetchApplications();

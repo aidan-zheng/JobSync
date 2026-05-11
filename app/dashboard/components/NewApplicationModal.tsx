@@ -51,13 +51,6 @@ interface NewApplicationModalProps {
 
 type Mode = "automatic" | "paste" | "manual";
 
-function getLocalDateString(d: Date = new Date()): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 const EMPTY_FORM = {
   job_url: "",
   pasted_text: "",

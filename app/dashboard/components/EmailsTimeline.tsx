@@ -183,7 +183,7 @@ function ChildDescription({ event }: { event: TimelineEvent }) {
           <span className={styles.timelineHighlight}>
             {event.field_label}
           </span>
-          {" →"}
+          {" ->"}
         </span>
         <div className={styles.timelineValueBlock}>
           {event.value_label}
@@ -195,7 +195,7 @@ function ChildDescription({ event }: { event: TimelineEvent }) {
   return (
     <span className={styles.timelineGroupChildDesc}>
       <span className={styles.timelineHighlight}>{event.field_label}</span>
-      {" → "}
+      {" -> "}
       <span className={styles.timelineHighlight}>{event.value_label}</span>
     </span>
   );
@@ -240,7 +240,7 @@ function SingleEvent({
         <div className={styles.timelineTopRow}>
           <TypeBadge eventType={event.event_type} />
           <span className={styles.timelineTime}>
-            {formatDate(event.created_at)} · {formatTime(event.created_at)}
+            {formatDate(event.created_at)} | {formatTime(event.created_at)}
           </span>
         </div>
         {isStandaloneEmail ? (
@@ -317,7 +317,7 @@ function GroupedEntry({
         <div className={styles.timelineTopRow}>
           <TypeBadge eventType={group.event_type} />
           <span className={styles.timelineTime}>
-            {formatDate(group.created_at)} · {formatTime(group.created_at)}
+            {formatDate(group.created_at)} | {formatTime(group.created_at)}
           </span>
         </div>
 
