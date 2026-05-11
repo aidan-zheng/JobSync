@@ -1,5 +1,5 @@
 /**
- * Handles fetching the user's list of current applications and creating new applications (both via manual input and automated scraping).
+ * Handles fetching and creating job applications.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/supabase/api-auth";
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (auth.errorResponse) return auth.errorResponse;
   const { user, admin } = auth;
 
-  // joins application_current with applications to filter by user_id in a single query.
+  // Join application_current with applications to filter by user_id in one query.
   const { data, error } = await admin
     .from("application_current")
     .select("*, applications!inner(user_id)")
@@ -35,8 +35,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // clean up inner join metadata from the response
-  const cleanedData = (data ?? []).map(({ applications, ...rest }) => rest);
+  // Remove join metadata before sending rows to the client.
+  const cleanedData = (data ?? []).map((row) => {
+    const cleaned = { ...row };
+    delete (cleaned as { applications?: unknown }).applications;
+    return cleaned;
+  });
 
   return NextResponse.json(cleanedData);
 }
@@ -108,8 +112,8 @@ export async function POST(request: NextRequest) {
 
       if (!autoImportResp.ok) {
         const errText = await autoImportResp.text();
-        let parsedErr;
-        try { parsedErr = JSON.parse(errText); } catch { parsedErr = null; }
+        let parsedErr: { error?: string } | null;
+        try { parsedErr = JSON.parse(errText) as { error?: string }; } catch { parsedErr = null; }
         return NextResponse.json(
           { error: parsedErr?.error || "Auto-import proxy failed" },
           { status: autoImportResp.status }
@@ -118,8 +122,9 @@ export async function POST(request: NextRequest) {
 
       const autoImportData = await autoImportResp.json();
       return NextResponse.json(autoImportData);
-    } catch (err: any) {
-      return NextResponse.json({ error: err.message || "Internal network failure" }, { status: 500 });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Internal network failure";
+      return NextResponse.json({ error: message }, { status: 500 });
     }
   }
 

@@ -15,8 +15,8 @@ import { recalculateApplication, buildFieldEvents } from "@/lib/applications";
 function verifyCronSecret(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    // if no secret is configured, block all requests in production.
-    console.error("[cron] CRON_SECRET is not set – rejecting request");
+    // If no secret is configured, block all requests in production.
+    console.error("[cron] CRON_SECRET is not set; rejecting request");
     return false;
   }
   const authHeader = request.headers.get("authorization") ?? "";
@@ -38,6 +38,10 @@ function isObviouslyIrrelevant(subject: string, sender: string): boolean {
   return false;
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Scan Gmail for a user and trigger automated LLM evaluations.
  */
@@ -49,7 +53,7 @@ async function scanForUser(
 ) {
   const now = new Date();
 
-  // Determine start of scan window
+  // Determine the start of the scan window.
   let startDate: string;
   if (lastScanTime) {
     const d = new Date(lastScanTime);
@@ -70,18 +74,20 @@ async function scanForUser(
   let accessToken: string;
   try {
     accessToken = await getValidGoogleToken(admin, userId);
-  } catch (err: any) {
-    console.error(`[cron] Token error for user ${userId}:`, err.message);
-    return { userId, error: err.message };
+  } catch (err: unknown) {
+    const message = getErrorMessage(err);
+    console.error(`[cron] Token error for user ${userId}:`, message);
+    return { userId, error: message };
   }
 
   // 2. Fetch Gmail messages
-  let gmailMessages;
+  let gmailMessages: Awaited<ReturnType<typeof fetchGmailMessages>>;
   try {
     gmailMessages = await fetchGmailMessages(accessToken, startDate, endDate);
-  } catch (err: any) {
-    console.error(`[cron] Gmail fetch error for user ${userId}:`, err.message);
-    return { userId, error: err.message };
+  } catch (err: unknown) {
+    const message = getErrorMessage(err);
+    console.error(`[cron] Gmail fetch error for user ${userId}:`, message);
+    return { userId, error: message };
   }
 
   // 3. Load user's tracked applications
@@ -124,7 +130,7 @@ async function scanForUser(
     return { userId, scanned: gmailMessages.length, processed: 0 };
   }
 
-  // 5. Stage 1 — batch relevance check, keep only HIGH confidence
+  // 5. Stage 1 - batch relevance check, keep only high-confidence matches.
   const BATCH_SIZE = 25;
   const CONCURRENCY = 3;
   const batches: typeof newEmails[] = [];
@@ -165,7 +171,7 @@ async function scanForUser(
 
     for (const { batch, relevanceResults } of results) {
       for (const rel of relevanceResults) {
-        // high only b/c automated scans
+        // Only high-confidence results are safe for automated scans.
         if (!rel.relevant || rel.confidence !== "high") continue;
 
         const msg = batch.find((m) => m.messageId === rel.messageId);
@@ -189,13 +195,13 @@ async function scanForUser(
     }
   }
 
-  console.log(`[cron] User ${userId}: ${newEmails.length} new → ${highConfidenceEmails.length} high-confidence`);
+  console.log(`[cron] User ${userId}: ${newEmails.length} new -> ${highConfidenceEmails.length} high-confidence`);
 
   if (highConfidenceEmails.length === 0) {
     return { userId, scanned: gmailMessages.length, processed: 0 };
   }
 
-  // 6. Stage 2 — body parsing
+  // 6. Stage 2 - body parsing.
   const appDataMap = new Map(
     applications.map((a) => [a.application_id, { status: a.status, contact_person: null as string | null }]),
   );

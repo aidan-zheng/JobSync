@@ -25,8 +25,6 @@ type ExtractionFields = {
   is_job_posting?: unknown;
 };
 
-
-
 const MANUAL_DEFAULTS = {
   company_name: "Company",
   job_title: "Job Title",
@@ -46,21 +44,21 @@ const FETCH_TIMEOUT_MS = 15_000;
 
 function normalizeHttpUrl(input: string): string | null {
   try {
-    let cleanInput = input.trim();
+    const cleanInput = input.trim();
     if (!cleanInput) return null;
 
-    // accept http or https
+    // Accept http or https.
     if (/^https?:\/\//i.test(cleanInput)) {
       const u = new URL(cleanInput);
       return u.toString();
     }
 
-    // reject ftp or other protocols
+    // Reject ftp or other protocols.
     if (/^[a-zA-Z0-9+.-]+:\/\//i.test(cleanInput)) {
       return null;
     }
 
-    // prepend https:// without protocol
+    // Prepend https:// when no protocol is provided.
     const u = new URL("https://" + cleanInput);
     return u.toString();
   } catch {
@@ -87,20 +85,20 @@ function cleanPastedText(text: string): string {
     const trimmed = line.trim();
     if (!trimmed) return false;
 
-    // Skip common boilerplate
+    // Skip common boilerplate.
     if (/copyright|terms of (?:service|use)|privacy policy|cookie policy/i.test(trimmed)) return false;
 
-    // Skip very short lines that are purely navigation or UI noise
+    // Skip very short lines that are purely navigation or UI noise.
     if (trimmed.length < 20) {
       const lower = trimmed.toLowerCase();
-      if (['home', 'jobs', 'careers', 'about', 'contact', 'sign in', 'log in', 'sign up', 'register', 'menu', 'navigation', 'search', 'filter'].includes(lower)) {
+      if (["home", "jobs", "careers", "about", "contact", "sign in", "log in", "sign up", "register", "menu", "navigation", "search", "filter"].includes(lower)) {
         return false;
       }
     }
 
     return true;
   });
-  return filtered.join('\n');
+  return filtered.join("\n");
 }
 
 function truncate(text: string, maxChars: number): string {
@@ -190,10 +188,8 @@ async function fetchWithTimeout(
   }
 }
 
-
-
 async function extractWithAI(truncatedText: string) {
-  return await parseJobPage(truncatedText);
+  return parseJobPage(truncatedText);
 }
 
 export async function POST(request: NextRequest) {
@@ -240,9 +236,10 @@ export async function POST(request: NextRequest) {
         },
         FETCH_TIMEOUT_MS,
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
       return NextResponse.json(
-        { error: `Fetch failed: ${err?.message || "Unknown error"}.` },
+        { error: `Fetch failed: ${message}.` },
         { status: 400 },
       );
     }
@@ -498,4 +495,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(data);
 }
-

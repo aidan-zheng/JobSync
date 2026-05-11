@@ -19,7 +19,6 @@ import type {
   LocationType,
   SalaryType,
 } from "@/types/applications";
-import { recalculateApplication } from "@/lib/applications";
 
 export async function GET(
   request: NextRequest,
@@ -301,7 +300,7 @@ export async function PUT(
   }
 
   // Standard insert for new updates
-  let eventTime = new Date().toISOString();
+  const eventTime = new Date().toISOString();
   const eventRow = {
     application_id: applicationId,
     email_id: null as number | null,

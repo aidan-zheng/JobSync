@@ -6,7 +6,6 @@ import { requireAppOwner } from "@/lib/supabase/api-auth";
 import type {
   ApplicationFieldName,
   ApplicationStatus,
-  Confidence,
   LocationType,
   SourceType,
 } from "@/types/applications";

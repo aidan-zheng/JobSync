@@ -1,5 +1,5 @@
 /**
- * Handles fetching, toggling, and deleting emails linked to applications. Triggers state recalculation to maintain chronological accuracy when email links are modified.
+ * Handles emails linked to applications and recalculates application state when links change.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, requireAppOwner } from "@/lib/supabase/api-auth";
@@ -72,6 +72,13 @@ interface CreateEmailBody {
   confidence?: Confidence;
   linked?: boolean;
 }
+
+type LinkWithOwner = {
+  id: number;
+  email_id: number;
+  application_id: number;
+  applications: { user_id: string } | { user_id: string }[];
+};
 
 export async function POST(request: NextRequest) {
   let body: CreateEmailBody;
@@ -248,8 +255,8 @@ export async function DELETE(request: NextRequest) {
   }
 
   const applicationId = links[0].application_id;
-  const emailIds = links.map((l: any) => l.email_id);
-  const linkIds = links.map((l: any) => l.id);
+  const emailIds = (links as LinkWithOwner[]).map((link) => link.email_id);
+  const linkIds = (links as LinkWithOwner[]).map((link) => link.id);
 
   await admin
     .from("application_field_events")

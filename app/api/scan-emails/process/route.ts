@@ -1,5 +1,5 @@
 /**
- * Stage 2 of AI Email Parsing: Processes specifically marked "relevant" emails by using an LLM to accurately extract structured field updates (status, salary, etc.) and logs them to the application timeline.
+ * Processes selected relevant emails and logs extracted field updates to the application timeline.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/supabase/api-auth";
@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Ensure selectedEmails is deduplicated just in case the UI sent the same email twice
-  const uniqueEmailsMap = new Map();
+  // Deduplicate selected emails in case the UI sent the same row twice.
+  const uniqueEmailsMap = new Map<string, ProcessRequestBody["emails"][number]>();
   for (const e of selectedEmails) {
     const key = `${e.messageId}-${e.application_id}`;
     if (!uniqueEmailsMap.has(key)) {
@@ -95,12 +95,14 @@ export async function POST(request: NextRequest) {
           },
         );
 
-        console.log(`[Process] Parsed output for msg ${selected.messageId}:`, parsed);
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[Process] Parsed output for msg ${selected.messageId}:`, parsed);
+        }
 
-        let emailReceivedAt;
+        let emailReceivedAt: string;
         try {
           emailReceivedAt = new Date(message.date).toISOString();
-        } catch (dateErr) {
+        } catch {
           console.warn(`[Process] Invalid date from Gmail: ${message.date}. Using current time.`);
           emailReceivedAt = new Date().toISOString();
         }
