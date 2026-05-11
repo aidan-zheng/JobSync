@@ -1,14 +1,14 @@
 // swap-google-auth.js
 // npm run edScope or npm run itaiScope
 
-// 1. Automatically parse the project ref
+// 1. Parse the project ref.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const PROJECT_REF = supabaseUrl ? new URL(supabaseUrl).hostname.split('.')[0] : null;
 
-// 2. Load your personal access token 
+// 2. Load the Supabase access token.
 const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 
-// 3. Map your specific scopes from the .env file 
+// 3. Map the available Google OAuth credential sets from the .env file.
 const SCOPES = {
   edScope: {
     clientId: process.env.ED_CLIENT,
@@ -22,14 +22,14 @@ const SCOPES = {
 
 async function swapGoogleCredentials(scopeName) {
   if (!PROJECT_REF || !ACCESS_TOKEN) {
-    console.error('❌ Missing PROJECT_REF or SUPABASE_ACCESS_TOKEN. Check your .env file.');
+    console.error('Missing PROJECT_REF or SUPABASE_ACCESS_TOKEN. Check your .env file.');
     return;
   }
 
   const targetScope = SCOPES[scopeName];
 
   if (!targetScope || !targetScope.clientId || !targetScope.clientSecret) {
-    console.error(`❌ Scope "${scopeName}" not found or missing credentials in .env.`);
+    console.error(`Scope "${scopeName}" not found or missing credentials in .env.`);
     return;
   }
 
@@ -56,9 +56,9 @@ async function swapGoogleCredentials(scopeName) {
       throw new Error(`API Error: ${response.status} - ${errorText}`);
     }
 
-    console.log(`✅ Successfully updated Supabase project to use ${scopeName} credentials.`);
+    console.log(`Successfully updated Supabase project to use ${scopeName} credentials.`);
   } catch (error) {
-    console.error('❌ Failed to swap credentials:', error.message);
+    console.error('Failed to swap credentials:', error.message);
   }
 }
 

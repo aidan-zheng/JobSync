@@ -26,19 +26,19 @@ async function cleanEmails() {
   if (eventErr) {
     console.error("Failed to delete application field events:", eventErr.message);
   } else {
-    console.log("✔ Cleared application_field_events.");
+    console.log("Cleared application_field_events.");
   }
 
   // 2. Delete application email links
   const { error: linkErr } = await supabase
     .from("application_email_links")
     .delete()
-    .neq("id", 0); // Hack to delete all rows
+    .neq("id", 0);
 
   if (linkErr) {
     console.error("Failed to delete application email links:", linkErr.message);
   } else {
-    console.log("✔ Cleared application_email_links.");
+    console.log("Cleared application_email_links.");
   }
 
   // 3. Delete all emails
@@ -50,7 +50,7 @@ async function cleanEmails() {
   if (emailErr) {
     console.error("Failed to delete emails:", emailErr.message);
   } else {
-    console.log("✔ Cleared emails table.");
+    console.log("Cleared emails table.");
   }
 
   console.log("\nDone! Database is clear for a fresh scan.");
