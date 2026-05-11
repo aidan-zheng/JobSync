@@ -3,8 +3,10 @@
  * Uses the user's Google OAuth provider token.
  */
 import { NextResponse } from "next/server";
+import type { createAdminClient } from "@/lib/supabase/admin";
 
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
+type AdminClient = ReturnType<typeof createAdminClient>;
 
 export interface GmailMessage {
   messageId: string;
@@ -241,11 +243,15 @@ export async function refreshGoogleAccessToken(refreshToken: string) {
     throw new Error(`Failed to refresh Google token (${res.status}): ${text}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as {
+    access_token: string;
+    expires_in?: number;
+    refresh_token?: string;
+  };
   return {
-    access_token: data.access_token as string,
-    expires_in: data.expires_in as number,     // seconds
-    refresh_token: data.refresh_token as string | undefined, // sometimes returned, sometimes not
+    access_token: data.access_token,
+    expires_in: data.expires_in ?? 0,
+    refresh_token: data.refresh_token,
   };
 }
 
@@ -254,7 +260,7 @@ export async function refreshGoogleAccessToken(refreshToken: string) {
  * If the current token is near expiration and a refresh token is available,
  * it will automatically refresh the token and update the database.
  */
-export async function getValidGoogleToken(admin: any, userId: string): Promise<string> {
+export async function getValidGoogleToken(admin: AdminClient, userId: string): Promise<string> {
   const { data: tokenRow, error: tokenErr } = await admin
     .from("user_tokens")
     .select("access_token, refresh_token, expires_at")
@@ -297,7 +303,7 @@ export async function getValidGoogleToken(admin: any, userId: string): Promise<s
 }
 
 export async function requireGoogleToken(
-  admin: any,
+  admin: AdminClient,
   userId: string,
 ): Promise<
   | { accessToken: string; errorResponse?: undefined }
@@ -306,8 +312,9 @@ export async function requireGoogleToken(
   try {
     const accessToken = await getValidGoogleToken(admin, userId);
     return { accessToken };
-  } catch (err: any) {
-    if (err.message === "NO_TOKEN") {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "NO_TOKEN") {
       return {
         errorResponse: NextResponse.json(
           { error: "No Google token found.", code: "NO_TOKEN" },

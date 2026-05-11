@@ -2,10 +2,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { ParsedEmailUpdate } from "@/lib/llm-parser";
 import { parseConfidenceNum } from "@/types/applications";
 
+type FieldValueEvent = {
+  value_status?: unknown;
+  value_number?: unknown;
+  value_text?: unknown;
+  value_location_type?: unknown;
+  value_date?: unknown;
+};
+
 // Extracts the single scalar value from a field event row.
 export function extractFieldValue(
   fieldName: string,
-  event: Record<string, any>,
+  event: FieldValueEvent,
 ): unknown {
   switch (fieldName) {
     case "status":

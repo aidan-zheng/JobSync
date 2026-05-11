@@ -52,6 +52,9 @@ interface GroqMessage {
   content: string;
 }
 
+type JsonRecord = Record<string, unknown>;
+type ConfidenceLabel = "high" | "medium" | "low";
+
 async function callGroq(messages: GroqMessage[], model: string, apiKey: string): Promise<string> {
   const res = await fetch(GROQ_API_URL, {
     method: "POST",
@@ -122,7 +125,11 @@ async function callGroqWithRetry(messages: GroqMessage[], type: "body" | "header
   throw new Error(`All ${type} Groq models exhausted or unavailable after ${MAX_CYCLES} retry cycles.`);
 }
 
-function extractJson(raw: string): any {
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractJson(raw: string): JsonRecord {
   let cleaned = raw.trim();
   if (cleaned.startsWith("```json")) {
     cleaned = cleaned.slice(7);
@@ -132,25 +139,41 @@ function extractJson(raw: string): any {
   if (cleaned.endsWith("```")) {
     cleaned = cleaned.slice(0, -3);
   }
-  return JSON.parse(cleaned.trim());
+  const parsed = JSON.parse(cleaned.trim()) as unknown;
+  return isRecord(parsed) ? parsed : {};
 }
 
-function robustNumber(val: any): number | null {
+function robustNumber(val: unknown): number | null {
   if (val == null) return null;
-  if (typeof val === 'number') return isFinite(val) ? val : null;
+  if (typeof val === "number") return Number.isFinite(val) ? val : null;
 
-  const cleaned = String(val).replace(/[$,]/g, '');
-  const parsed = parseFloat(cleaned);
-  return isFinite(parsed) ? parsed : null;
+  const cleaned = String(val).replace(/[$,]/g, "");
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-// Stage 1: Relevance Check 
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function lowerStringValue(value: unknown): string | null {
+  return stringValue(value)?.toLowerCase() ?? null;
+}
+
+function confidenceValue(value: unknown, fallback: ConfidenceLabel): ConfidenceLabel {
+  const normalized = lowerStringValue(value);
+  return normalized === "high" || normalized === "medium" || normalized === "low"
+    ? normalized
+    : fallback;
+}
+
+// Stage 1: Relevance Check
 
 export interface BatchRelevanceResult {
   messageId: string;
   relevant: boolean;
   matched_application_id: number | null;
-  confidence: "high" | "medium" | "low";
+  confidence: ConfidenceLabel;
 }
 
 /**
@@ -195,10 +218,22 @@ ${emailList}`;
 
   try {
     const parsed = extractJson(raw);
-    const results = parsed.results || [];
+    const results = Array.isArray(parsed.results) ? parsed.results : [];
     return emails.map(e => {
-      const found = results.find((r: any) => r.messageId === e.messageId);
-      if (found) return found;
+      const found = results.find(
+        (result) => isRecord(result) && result.messageId === e.messageId,
+      );
+      if (isRecord(found)) {
+        return {
+          messageId: e.messageId,
+          relevant: found.relevant === true,
+          matched_application_id:
+            typeof found.matched_application_id === "number"
+              ? found.matched_application_id
+              : null,
+          confidence: confidenceValue(found.confidence, "low"),
+        };
+      }
       return {
         messageId: e.messageId,
         relevant: false,
@@ -217,7 +252,7 @@ ${emailList}`;
   }
 }
 
-// Stage 2: Body Parsing 
+// Stage 2: Body Parsing
 
 export interface ParsedEmailUpdate {
   status: string | null;
@@ -227,7 +262,7 @@ export interface ParsedEmailUpdate {
   location: string | null;
   contact_person: string | null;
   notes: string | null;
-  confidence: "high" | "medium" | "low";
+  confidence: ConfidenceLabel;
 }
 
 /**
@@ -263,7 +298,7 @@ Rules:
 1. If focusing on a mismatched company, set all updates to null.
 2. Infer status safely (confirmations->applied, rejections->rejected, invites->interviewing, offers->offer).`;
 
-  const userPrompt = `Application: ${currentApplication.company_name} — ${currentApplication.job_title} (current status: ${currentApplication.status})
+  const userPrompt = `Application: ${currentApplication.company_name} - ${currentApplication.job_title} (current status: ${currentApplication.status})
 
 Email Subject: "${subject}"
 Email From: "${sender}"
@@ -279,7 +314,7 @@ ${truncatedBody}`;
   try {
     const parsed = extractJson(raw);
 
-    let contact_person = parsed.contact_person ?? null;
+    let contact_person = stringValue(parsed.contact_person);
     if (
       contact_person &&
       currentApplication.contact_person &&
@@ -289,14 +324,14 @@ ${truncatedBody}`;
     }
 
     return {
-      status: parsed.status ? parsed.status.toLowerCase() : null,
+      status: lowerStringValue(parsed.status),
       compensation_amount: robustNumber(parsed.compensation_amount),
-      salary_type: parsed.salary_type ? parsed.salary_type.toLowerCase() : null,
-      location_type: parsed.location_type ? parsed.location_type.toLowerCase() : null,
-      location: parsed.location ?? null,
+      salary_type: lowerStringValue(parsed.salary_type),
+      location_type: lowerStringValue(parsed.location_type),
+      location: stringValue(parsed.location),
       contact_person: contact_person,
-      notes: parsed.notes ?? null,
-      confidence: parsed.confidence ? parsed.confidence.toLowerCase() : "medium",
+      notes: stringValue(parsed.notes),
+      confidence: confidenceValue(parsed.confidence, "medium"),
     };
   } catch (err) {
     console.error(`[Stage 2] Failed to parse LLM JSON:`, err, "\nRaw output:", raw);
@@ -355,15 +390,15 @@ Please extract the details only from the content within the tags above.`;
   try {
     const parsed = extractJson(raw);
     return {
-      is_job_posting: parsed.is_job_posting ?? false,
-      company_name: parsed.company_name ?? null,
-      job_title: parsed.job_title ?? null,
-      location: parsed.location ?? null,
-      location_type: parsed.location_type ?? null,
+      is_job_posting: typeof parsed.is_job_posting === "boolean" ? parsed.is_job_posting : false,
+      company_name: stringValue(parsed.company_name),
+      job_title: stringValue(parsed.job_title),
+      location: stringValue(parsed.location),
+      location_type: stringValue(parsed.location_type),
       compensation_amount: robustNumber(parsed.compensation_amount),
-      salary_type: parsed.salary_type ?? null,
-      contact_person: parsed.contact_person ?? null,
-      notes: parsed.notes ?? null,
+      salary_type: stringValue(parsed.salary_type),
+      contact_person: stringValue(parsed.contact_person),
+      notes: stringValue(parsed.notes),
     };
   } catch (err) {
     console.error(`[Scraper Parsing] Failed to parse LLM JSON:`, err, "\nRaw:", raw);
