@@ -57,7 +57,6 @@ Optional values:
 
 - `CRON_SECRET` - required only for the scheduled auto-scan endpoint
 - `GROQ_API_KEY_2`, `GROQ_API_KEY_3`, etc. - optional extra Groq keys for rate-limit fallback
-- `SUPABASE_ACCESS_TOKEN` - only used by the local Google auth swap helper
 
 ## Supabase Setup
 
