@@ -57,7 +57,7 @@ Optional values:
 
 - `CRON_SECRET` - required only for the scheduled auto-scan endpoint
 - `GROQ_API_KEY_2`, `GROQ_API_KEY_3`, etc. - optional extra Groq keys for rate-limit fallback
-- `SUPABASE_ACCESS_TOKEN`, `ED_CLIENT`, `ED_SECRET`, `ITAI_CLIENT`, `ITAI_SECRET` - only used by the local Google auth swap helper
+- `SUPABASE_ACCESS_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` - only used by the local Google auth swap helper
 
 ## Supabase Setup
 
@@ -113,5 +113,3 @@ npm start
 npm run lint
 npm run build
 ```
-
-The `auth:ed` and `auth:itai` scripts are optional local helpers for swapping Google OAuth credentials in a Supabase project. They require the optional environment variables listed above and are not required to run the application.
